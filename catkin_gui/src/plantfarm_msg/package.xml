@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>plantfarm_msg</name>
+  <version>0.0.0</version>
+  <description>The plantfarm_msg package</description>
+
+  <maintainer email="1111@todo.todo">bckaaa</maintainer>
+
+  <license>Apache 2.0</license>
+
+  <depend>catkin</depend>
+  <depend>rospy</depend> 
+  <depend>tf</depend>
+  <depend>roscpp</depend> 
+  <depend>std_msgs</depend>
+  
+  <depend>message_generation</depend>
+  <depend>rostime</depend>
+  
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>geometry_msgs</depend>
+
+  <!-- 메시지와 서비스 파일 의존성 추가 -->
+  <exec_depend>message_runtime</exec_depend>
+
+  <export>
+    <!-- 다른 도구에서 추가 정보를 요청할 수 있음 -->
+  </export>
+</package>

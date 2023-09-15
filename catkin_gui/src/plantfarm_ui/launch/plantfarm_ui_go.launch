@@ -1,0 +1,3 @@
+<launch>
+  <node name="plantfarm_ui_node" pkg="plantfarm_ui" type="plantfarm_ui_node" output="screen"/>
+</launch>

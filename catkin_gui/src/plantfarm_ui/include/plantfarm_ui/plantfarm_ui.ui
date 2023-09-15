@@ -1,0 +1,802 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>plantfarm_ui</class>
+ <widget class="QWidget" name="plantfarm_ui">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1109</width>
+    <height>651</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <widget class="QStackedWidget" name="stackedWidget">
+   <property name="geometry">
+    <rect>
+     <x>9</x>
+     <y>10</y>
+     <width>1081</width>
+     <height>631</height>
+    </rect>
+   </property>
+   <property name="currentIndex">
+    <number>4</number>
+   </property>
+   <widget class="QWidget" name="widget_home">
+    <widget class="QPushButton" name="pushButton_calibration">
+     <property name="geometry">
+      <rect>
+       <x>620</x>
+       <y>60</y>
+       <width>251</width>
+       <height>231</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Calibration</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_start_process">
+     <property name="geometry">
+      <rect>
+       <x>620</x>
+       <y>350</y>
+       <width>251</width>
+       <height>231</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Start Process</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_currentPosx">
+     <property name="geometry">
+      <rect>
+       <x>220</x>
+       <y>350</y>
+       <width>251</width>
+       <height>231</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Get current posx by tool</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_connect">
+     <property name="geometry">
+      <rect>
+       <x>220</x>
+       <y>60</y>
+       <width>251</width>
+       <height>231</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Connect device</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="widget_connect">
+    <widget class="QTextEdit" name="textEdit_connect_log">
+     <property name="geometry">
+      <rect>
+       <x>610</x>
+       <y>50</y>
+       <width>421</width>
+       <height>531</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_connect_dsr">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>60</y>
+       <width>221</width>
+       <height>131</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Connect Doosan Robot</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_connect_rs">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>250</y>
+       <width>221</width>
+       <height>131</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Connect Realsense</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_connect_yolo">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>440</y>
+       <width>221</width>
+       <height>131</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Start YOLO</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_20">
+     <property name="geometry">
+      <rect>
+       <x>810</x>
+       <y>20</y>
+       <width>31</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Log</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_connect_home">
+     <property name="geometry">
+      <rect>
+       <x>490</x>
+       <y>550</y>
+       <width>89</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>HOME</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="widget_handeye_calibration">
+    <widget class="QPushButton" name="pushButton_haneye_calibration_calculate">
+     <property name="geometry">
+      <rect>
+       <x>500</x>
+       <y>550</y>
+       <width>151</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Calculate C2T</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_handeye_pic">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>40</y>
+       <width>641</width>
+       <height>381</height>
+      </rect>
+     </property>
+     <property name="autoFillBackground">
+      <bool>true</bool>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Box</enum>
+     </property>
+     <property name="lineWidth">
+      <number>2</number>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_7">
+     <property name="geometry">
+      <rect>
+       <x>270</x>
+       <y>10</y>
+       <width>121</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Calibration Image</string>
+     </property>
+    </widget>
+    <widget class="QListWidget" name="listWidget_haneye_calibration_b2t">
+     <property name="geometry">
+      <rect>
+       <x>970</x>
+       <y>40</y>
+       <width>111</width>
+       <height>561</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_haneye_calibration_getmatch">
+     <property name="geometry">
+      <rect>
+       <x>500</x>
+       <y>520</y>
+       <width>151</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Get Match</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_haneye_calibration_findchess">
+     <property name="geometry">
+      <rect>
+       <x>500</x>
+       <y>490</y>
+       <width>151</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Find Chessboard</string>
+     </property>
+    </widget>
+    <widget class="QListWidget" name="listWidget_haneye_calibration_t2c">
+     <property name="geometry">
+      <rect>
+       <x>850</x>
+       <y>40</y>
+       <width>111</width>
+       <height>561</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_10">
+     <property name="geometry">
+      <rect>
+       <x>1010</x>
+       <y>10</y>
+       <width>31</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>B2T</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_8">
+     <property name="geometry">
+      <rect>
+       <x>740</x>
+       <y>10</y>
+       <width>31</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Log</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_9">
+     <property name="geometry">
+      <rect>
+       <x>890</x>
+       <y>10</y>
+       <width>31</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>T2C</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_haneye_calibration_home">
+     <property name="geometry">
+      <rect>
+       <x>500</x>
+       <y>580</y>
+       <width>151</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>HOME</string>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_haneye_calibration_log">
+     <property name="geometry">
+      <rect>
+       <x>660</x>
+       <y>40</y>
+       <width>181</width>
+       <height>561</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+      </font>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_haneye_calibration_showimage">
+     <property name="geometry">
+      <rect>
+       <x>500</x>
+       <y>440</y>
+       <width>151</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Show Image</string>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_fx">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>450</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_fy">
+     <property name="geometry">
+      <rect>
+       <x>110</x>
+       <y>450</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_cx">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>510</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_cy">
+     <property name="geometry">
+      <rect>
+       <x>110</x>
+       <y>510</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_t2">
+     <property name="geometry">
+      <rect>
+       <x>300</x>
+       <y>510</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_k1">
+     <property name="geometry">
+      <rect>
+       <x>210</x>
+       <y>450</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_t1">
+     <property name="geometry">
+      <rect>
+       <x>210</x>
+       <y>510</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_k2">
+     <property name="geometry">
+      <rect>
+       <x>300</x>
+       <y>450</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_get_k3">
+     <property name="geometry">
+      <rect>
+       <x>210</x>
+       <y>570</y>
+       <width>81</width>
+       <height>31</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_haneye_calibration_disto">
+     <property name="geometry">
+      <rect>
+       <x>300</x>
+       <y>550</y>
+       <width>81</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>distortion
+parameter</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_haneye_calibration_intrpara">
+     <property name="geometry">
+      <rect>
+       <x>110</x>
+       <y>550</y>
+       <width>81</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>intrinsic
+parameter</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_haneye_calibration_campara">
+     <property name="geometry">
+      <rect>
+       <x>400</x>
+       <y>550</y>
+       <width>81</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>camera
+parameter</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_11">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>430</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       fx</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_12">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>430</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       fy</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_13">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>490</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       cx</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_14">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>490</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       cy</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_15">
+     <property name="geometry">
+      <rect>
+       <x>310</x>
+       <y>490</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       t2</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_16">
+     <property name="geometry">
+      <rect>
+       <x>220</x>
+       <y>490</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       t1</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_17">
+     <property name="geometry">
+      <rect>
+       <x>220</x>
+       <y>430</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       k1</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_18">
+     <property name="geometry">
+      <rect>
+       <x>310</x>
+       <y>430</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       k2</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_19">
+     <property name="geometry">
+      <rect>
+       <x>220</x>
+       <y>550</y>
+       <width>61</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>       k3</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="widtet_currentPosx">
+    <widget class="QPushButton" name="pushButton_currentPosx_get">
+     <property name="geometry">
+      <rect>
+       <x>710</x>
+       <y>230</y>
+       <width>201</width>
+       <height>111</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>get tool's X,Y,Z </string>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_currentPosx_log">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>50</y>
+       <width>421</width>
+       <height>531</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_currentPosx_home">
+     <property name="geometry">
+      <rect>
+       <x>960</x>
+       <y>550</y>
+       <width>89</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>HOME</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="widget_process">
+    <widget class="QTextEdit" name="textEdit_process_log">
+     <property name="geometry">
+      <rect>
+       <x>660</x>
+       <y>20</y>
+       <width>421</width>
+       <height>261</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_get_image">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>520</y>
+       <width>91</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>get image</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_get_coord">
+     <property name="geometry">
+      <rect>
+       <x>260</x>
+       <y>520</y>
+       <width>121</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>get coordinate</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_process_image_raw">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>640</width>
+       <height>480</height>
+      </rect>
+     </property>
+     <property name="autoFillBackground">
+      <bool>true</bool>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Box</enum>
+     </property>
+     <property name="lineWidth">
+      <number>2</number>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="textEdit_log">
+     <property name="geometry">
+      <rect>
+       <x>660</x>
+       <y>320</y>
+       <width>421</width>
+       <height>261</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_home">
+     <property name="geometry">
+      <rect>
+       <x>560</x>
+       <y>560</y>
+       <width>89</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>HOME</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_move_robot">
+     <property name="geometry">
+      <rect>
+       <x>410</x>
+       <y>520</y>
+       <width>101</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>move robot</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_move_home">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>520</y>
+       <width>101</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>move home</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_move_robot2">
+     <property name="geometry">
+      <rect>
+       <x>540</x>
+       <y>520</y>
+       <width>101</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>move robot</string>
+     </property>
+    </widget>
+   </widget>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
