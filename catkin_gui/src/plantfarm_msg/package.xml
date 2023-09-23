@@ -13,6 +13,8 @@
   <depend>tf</depend>
   <depend>roscpp</depend> 
   <depend>std_msgs</depend>
+  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
   
   <depend>message_generation</depend>
   <depend>rostime</depend>

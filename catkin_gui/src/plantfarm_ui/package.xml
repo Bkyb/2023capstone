@@ -15,6 +15,14 @@
   <depend>tf</depend>    
   <depend>std_msgs</depend>
   
+  <build_depend>actionlib</build_depend>
+  <build_depend>actionlib_msgs</build_depend>
+  <exec_depend>actionlib</exec_depend>
+  <exec_depend>actionlib_msgs</exec_depend>
+  
+  <build_depend>plantfarm_msgs</build_depend>
+  <exec_depend>plantfarm_msgs</exec_depend>
+
   <depend>qtbase5-dev</depend>
   <depend>libboost-date-time-dev</depend>
   <depend>libboost-thread-dev</depend>
@@ -23,7 +31,7 @@
   <depend>roscpp_serialization</depend>
   <depend>rostime</depend>
   
-   <depend>plantfarm_msg</depend>
+  <depend>plantfarm_msg</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>geometry_msgs</depend>

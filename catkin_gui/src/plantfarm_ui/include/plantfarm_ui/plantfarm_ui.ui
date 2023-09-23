@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>4</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="widget_home">
     <widget class="QPushButton" name="pushButton_calibration">
@@ -93,8 +93,8 @@
     <widget class="QPushButton" name="pushButton_connect_dsr">
      <property name="geometry">
       <rect>
-       <x>140</x>
-       <y>60</y>
+       <x>50</x>
+       <y>120</y>
        <width>221</width>
        <height>131</height>
       </rect>
@@ -106,8 +106,8 @@
     <widget class="QPushButton" name="pushButton_connect_rs">
      <property name="geometry">
       <rect>
-       <x>140</x>
-       <y>250</y>
+       <x>50</x>
+       <y>340</y>
        <width>221</width>
        <height>131</height>
       </rect>
@@ -119,8 +119,8 @@
     <widget class="QPushButton" name="pushButton_connect_yolo">
      <property name="geometry">
       <rect>
-       <x>140</x>
-       <y>440</y>
+       <x>340</x>
+       <y>340</y>
        <width>221</width>
        <height>131</height>
       </rect>
@@ -153,6 +153,19 @@
      </property>
      <property name="text">
       <string>HOME</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_connect_dsr_con">
+     <property name="geometry">
+      <rect>
+       <x>340</x>
+       <y>120</y>
+       <width>221</width>
+       <height>131</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Start Move Doosan Robot</string>
      </property>
     </widget>
    </widget>

@@ -25,13 +25,16 @@ plantfarm_ui::plantfarm_ui(QWidget *parent) :
     yolo_image_sub_ = n->subscribe("/yolov7/image0", 1000, &plantfarm_ui::yolo_image_sub_cb, this);
     color_image_sub_ = n->subscribe("/camera/color/image_raw", 1000, &plantfarm_ui::color_image_sub_cb, this);
     depth_image_sub_ = n->subscribe("/camera/aligned_depth_to_color/image_raw", 1000, &plantfarm_ui::depth_image_sub_cb, this);
-    depth_image_16_sub_ = n->subscribe("/camera/aligned_depth_to_color/image_raw", 5, &plantfarm_ui::depth_image_16_sub_cb, this);
+    depth_image_16_sub_ = n->subscribe("/camera/aligned_depth_to_color/image_raw", 1000, &plantfarm_ui::depth_image_16_sub_cb, this);
     //color_image_sub_ = n->subscribe("/camera/color/image_raw", 1000, &plantfarm_ui::color_image_sub_cb, this);
     color_camera_info_sub_ = n->subscribe("/camera/color/camera_info", 1000, &plantfarm_ui::color_camera_info_sub_cb, this);
     yolo_sub_ = n->subscribe("/yolov7/result", 10, &plantfarm_ui::yolo_cb, this);
     yolo_kpt_sub_ = n->subscribe("/yolov8_kpt/result", 1, &plantfarm_ui::yolo_kpt_cb, this);   
     empty_sub_ = n->subscribe("/plantfarm/empty", 1, &plantfarm_ui::empty_cb, this);
     detected_num_sub_ = n->subscribe("/yolov7/detect_num", 10, &plantfarm_ui::detect_num_cb, this);
+    is_yolo_died_sub_ = n->subscribe("/yolov7/isshutdown", 10, &plantfarm_ui::is_yolo_died_cb, this);
+    dsr_state_sub_ = n->subscribe("/dsr01m1013/state", 10, &plantfarm_ui::dsr_state_cb, this);
+
     ui->stackedWidget->setCurrentIndex(0);
 
 
@@ -63,6 +66,8 @@ plantfarm_ui::plantfarm_ui(QWidget *parent) :
     fs1.release();*/
 }
 
+std::mutex mtx;
+bool moveOnce = false;
 int color_info_count = 0;
 double intrinsic_parameter[9];
 double discoeffs[5];
@@ -111,99 +116,142 @@ void plantfarm_ui::spinOnce()
         QApplication::quit();
 }
 
-int plantfarm_ui::movej(float *fTargetPos, float fTargetVel, float fTargetAcc, float fTargetTime, float fBlendingRadius, int nMoveMode, int nBlendingType, int nSyncType)
+void plantfarm_ui::wait(float time_)
 {
-  ui->textEdit_log->append("Move_joint START!");
-  ros::NodeHandlePtr node = boost::make_shared<ros::NodeHandle>();
-      ros::ServiceClient srvMoveJoint = node->serviceClient<dsr_msgs::MoveJoint>( "/dsr01m1013/motion/move_joint");
+    double time_lf = static_cast<double>(time_);
 
+    auto start_time = std::chrono::steady_clock::now();
 
+    std::chrono::duration<double> loop_duration(time_lf);
 
-      dsr_msgs::MoveJoint srv;
-
-      for(int i=0; i<6; i++)
-          srv.request.pos[i] = fTargetPos[i];
-      srv.request.vel = fTargetVel;
-      srv.request.acc = fTargetAcc;
-      srv.request.time = fTargetTime;
-      srv.request.radius = fBlendingRadius;
-      srv.request.mode = nMoveMode;
-      srv.request.blendType = nBlendingType;
-      srv.request.syncType = nSyncType;
-
-
-      QString text_for_append;
-
-      text_for_append.sprintf("  <pos> %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f",srv.request.pos[0],srv.request.pos[1],srv.request.pos[2],srv.request.pos[3],srv.request.pos[4],srv.request.pos[5]);
-      ui->textEdit_log->append(text_for_append);
-
-      text_for_append.sprintf("  <vel> %7.3f , <acc> %7.3f, <time> %7.3f",srv.request.vel, srv.request.acc, srv.request.time);
-      ui->textEdit_log->append(text_for_append);
-
-      text_for_append.sprintf("  <mode> %d , <radius> %7.3f, <blendType> %d",srv.request.mode, srv.request.radius, srv.request.blendType);
-      ui->textEdit_log->append(text_for_append);
-
-      if(srvMoveJoint.call(srv))
-      {
-         text_for_append.sprintf("  receive srv, srv.response.success: %ld\n", (long int)srv.response.success);
-          ui->textEdit_log->append(text_for_append);
-          return (srv.response.success);
-      }
-      else
-      {        
-           ui->textEdit_log->append("  Failed to call service dr_control_service : move_joint");
-          ros::shutdown();
-          return -1;
-      }
-
-      return 0;
-
+    while(true){        
+        auto current_time = std::chrono::steady_clock::now();
+        if (current_time - start_time >= loop_duration) {
+            break; 
+        }
+        spinOnce();
+    }
 }
 
-int plantfarm_ui::movel(float *fTargetPos, float *fTargetVel, float *fTargetAcc, float fTargetTime, float fBlendingRadius, int nMoveReference, int nMoveMode, int nBlendingType, int nSyncType)
+void plantfarm_ui::movej(float *fTargetPos, float fTargetVel, float fTargetAcc, float fTargetTime, float fBlendingRadius, int nMoveMode, int nBlendingType, int nSyncType)
 {
-      ros::NodeHandlePtr node = boost::make_shared<ros::NodeHandle>();
-      ros::ServiceClient srvMoveLine = node->serviceClient<dsr_msgs::MoveLine>( "/dsr01m1013/motion/move_line");
-      dsr_msgs::MoveLine srv;
 
-      for(int i=0; i<6; i++)
-          srv.request.pos[i] = fTargetPos[i];
-      for(int i=0; i<2; i++){
-          srv.request.vel[i] = fTargetVel[i];
-          srv.request.acc[i] = fTargetAcc[i];
-      }
-      srv.request.time = fTargetTime;
-      srv.request.radius = fBlendingRadius;
-      srv.request.ref  = nMoveReference;
-      srv.request.mode = nMoveMode;
-      srv.request.blendType = nBlendingType;
-      srv.request.syncType = nSyncType;
+    ros::NodeHandlePtr node = boost::make_shared<ros::NodeHandle>();
+    actionlib::SimpleActionClient<plantfarm_msg::dsr_movejointAction> ac(*node, "/plantfarm/movej", true);
 
+    ac.waitForServer(ros::Duration(2.0));
+    ui->textEdit_log->append("Move_joint START!");
+    
+    plantfarm_msg::dsr_movejointGoal goal;
 
-       QString text_for_append;
+    for(int i=0; i<6; i++)
+        goal.pos[i] = fTargetPos[i];
+    goal.vel = fTargetVel;
+    goal.acc = fTargetAcc;
+    goal.time = fTargetTime;
+    goal.radius = fBlendingRadius;
+    goal.mode = nMoveMode;
+    goal.blendType = nBlendingType;
+    goal.syncType = nSyncType;
 
-       text_for_append.sprintf("  <pos> %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f",srv.request.pos[0],srv.request.pos[1],srv.request.pos[2],srv.request.pos[3],srv.request.pos[4],srv.request.pos[5]);
-       ui->textEdit_log->append(text_for_append);
-      text_for_append.sprintf("  <vel> %7.3f,%7.3f <acc> %7.3f,%7.3f <time> %7.3f",srv.request.vel[0],srv.request.vel[1],srv.request.acc[0],srv.request.acc[1], srv.request.time);
-      ui->textEdit_log->append(text_for_append);
-      text_for_append.sprintf("  <mode> %d, <ref> %d, <radius> %7.3f, <blendType> %d",srv.request.mode,srv.request.ref, srv.request.radius, srv.request.blendType);
-      ui->textEdit_log->append(text_for_append);
+    QString text_for_append;
 
-      if(srvMoveLine.call(srv))
-      {
-          text_for_append.sprintf("receive srv, srv.response.success: %ld\n", (long int)srv.response.success);
-          ui->textEdit_log->append(text_for_append);
-          return (srv.response.success);
-      }
-      else
-      {
-          text_for_append.sprintf("Failed to call service dr_control_service : move_line\n");
-          ui->textEdit_log->append(text_for_append);
-          ros::shutdown();
-          return -1;
-      }
+    text_for_append.sprintf("  <pos> %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f",fTargetPos[0],fTargetPos[1],fTargetPos[2],fTargetPos[3],fTargetPos[4],fTargetPos[5]);
+    ui->textEdit_log->append(text_for_append);
 
-      return 0;
+    text_for_append.sprintf("  <vel> %7.3f  <acc> %7.3f <time> %7.3f",fTargetVel, fTargetAcc, fTargetTime);
+    ui->textEdit_log->append(text_for_append);
+
+    text_for_append.sprintf("  <mode> %d  <radius> %7.3f  <blendType> %d",nMoveMode, fBlendingRadius, nBlendingType);
+    ui->textEdit_log->append(text_for_append);
+    
+    moveOnce = true;
+    // std::thread send_thread([&]() {
+    //     ac.sendGoal(goal, boost::bind(&plantfarm_ui::movej_done_cb, this, _1, _2));
+    // });
+
+    // send_thread.join();
+    ac.sendGoal(goal,boost::bind(&plantfarm_ui::movej_done_cb, this, _1, _2));
+    // wait(fTargetTime + 0.2);
+    // ac.waitForResult((ros::Duration(10.0)));
+}
+
+void plantfarm_ui::movel(float *fTargetPos, float *fTargetVel, float *fTargetAcc, float fTargetTime, float fBlendingRadius, int nMoveReference, int nMoveMode, int nBlendingType, int nSyncType)
+{
+    ros::NodeHandlePtr node = boost::make_shared<ros::NodeHandle>();
+    actionlib::SimpleActionClient<plantfarm_msg::dsr_movelineAction> ac( *node, "/plantfarm/movel", true);
+    ac.waitForServer(ros::Duration(2.0));
+
+    ui->textEdit_log->append("Move_line START!");
+    
+    plantfarm_msg::dsr_movelineGoal goal;
+    
+    for(int i=0; i<6; i++)
+        goal.pos[i] = fTargetPos[i];
+    for(int i=0; i<2; i++){
+        goal.vel[i] = fTargetVel[i];
+        goal.acc[i] = fTargetAcc[i];
+    }
+    goal.time = fTargetTime;
+    goal.radius = fBlendingRadius;
+    goal.ref = nMoveReference;
+    goal.mode = nMoveMode;
+    goal.blendType = nBlendingType;
+    goal.syncType = nSyncType;
+
+    QString text_for_append;
+
+    text_for_append.sprintf("  <pos> %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f",fTargetPos[0],fTargetPos[1],fTargetPos[2],fTargetPos[3],fTargetPos[4],fTargetPos[5]);
+    ui->textEdit_log->append(text_for_append);
+
+    text_for_append.sprintf("  <vel> %7.3f,%7.3f <acc> %7.3f,%7.3f <time> %7.3f",fTargetVel[0],fTargetVel[1], fTargetAcc[0], fTargetAcc[1], fTargetTime);
+    ui->textEdit_log->append(text_for_append);
+
+    text_for_append.sprintf("  <mode> %d , <radius> %7.3f, <blendType> %d",nMoveMode, fBlendingRadius, nBlendingType);
+    ui->textEdit_log->append(text_for_append);
+
+    moveOnce = true;
+    // ac.waitForResult((ros::Duration(10.0)));
+    // std::thread send_thread([&]() {
+    //     ac.sendGoal(goal,boost::bind(&plantfarm_ui::movel_done_cb, this, _1, _2));
+    // });
+    // send_thread.join();
+    ac.sendGoal(goal,boost::bind(&plantfarm_ui::movel_done_cb, this, _1, _2));
+    // wait(fTargetTime + 0.2);
+    // if(ac.waitForResult((ros::Duration(10.0)))) ROS_INFO("fuck");
+    
+}
+
+void plantfarm_ui::movej_done_cb(const actionlib::SimpleClientGoalState &state, const plantfarm_msg::dsr_movejointResultConstPtr &result)
+{
+    ui->textEdit_log->append("  Failed to call service dr_control_service : move_joint"); 
+    std::lock_guard<std::mutex> lock(mtx);
+    if(state == actionlib::SimpleClientGoalState::SUCCEEDED)
+    {
+        ui->textEdit_log->append("  Failed to call service dr_control_service : move_joint");        
+        moveOnce = false;
+    }
+    else
+    {
+        ui->textEdit_log->append("  Failed to call service dr_control_service : move_joint");
+        moveOnce = false;
+    }
+}
+
+void plantfarm_ui::movel_done_cb(const actionlib::SimpleClientGoalState& state, const plantfarm_msg::dsr_movelineResultConstPtr& result)
+{      
+    ui->textEdit_log->append("  Failed to call service dr_control_service : move_joint"); 
+    std::lock_guard<std::mutex> lock(mtx);
+    if(state == actionlib::SimpleClientGoalState::SUCCEEDED)
+    {
+        ui->textEdit_log->append("  Failed to call service dr_control_service : move_joint");
+        moveOnce = false;
+    }
+    else
+    {
+        ui->textEdit_log->append("  Failed to call service dr_control_service : move_line");
+        moveOnce = false;
+    }
 }
 
 void plantfarm_ui::yolo_image_sub_cb(const sensor_msgs::Image::ConstPtr &image_raw)
@@ -353,8 +401,16 @@ void plantfarm_ui::detect_num_cb(const std_msgs::Int16 &int_16)
     detect_leaves_num = int_16.data;
 }
 
+void plantfarm_ui::is_yolo_died_cb(const std_msgs::Bool &bool_)
+{
+    isYoloDied = bool_.data;
+}
 
-
+void plantfarm_ui::dsr_state_cb(const dsr_msgs::RobotState &msg)
+{
+    RobotState = msg.robot_state;
+    // ROS_INFO("%d",RobotState);
+}
 // callback
 
 void plantfarm_ui::calculateEnd2Base(float& x, float& y, float& z, float& r, float& p, float& yw){
@@ -617,6 +673,7 @@ void plantfarm_ui::image_pipeline(cv::Mat depth_image, std::vector<std::vector<c
     if(kpt.empty()) return;
     // if(kpt2.empty()) return;
     if(detect_leaves_num != 1) return;
+    // if(isYoloDied) return;
     for(int i=0; i<contours.size(); i++)
     {
         cv::Mat abnormal_depth = make_contour_mask(depth_image, contours, kpt, i);
@@ -1027,7 +1084,7 @@ void plantfarm_ui::abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_d
     
 
 }
-// for callback functions
+// for empty callback functions
 
 ///////////////////////////////////////////Connect////////////////////////////////////////////
 
@@ -1068,14 +1125,44 @@ void plantfarm_ui::on_pushButton_connect_dsr_clicked()
     // }
     const char *command_0 = "gnome-terminal --tab -- /bin/bash -c 'roslaunch dsr_launcher single_robot_rviz.launch model:=m1013 mode:=real host:=192.168.137.100; exec bash'";
 
+    QString text_for_append;
+    text_for_append.sprintf("[INFO] Trying to connect DSR");
+    ui->textEdit_connect_log->append(text_for_append);
     int result_0 = system(command_0);
+
     if (result_0 == -1) {
-        QString text_for_append;
+        // QString text_for_append;
         text_for_append.sprintf("[ERROR] Failed to connect DSR");
         ui->textEdit_connect_log->append(text_for_append);
     } else {
-        QString text_for_append;
+        // QString text_for_append;
         text_for_append.sprintf("[INFO] DSR Node executed successfully.");
+        ui->textEdit_connect_log->append(text_for_append);
+    }
+}
+
+void plantfarm_ui::on_pushButton_connect_dsr_con_clicked()
+{
+    // if(n->hasParam("/dsr01m1013/aux_control/get_current_posx")){  
+    //     QString text_for_append0;
+    //     text_for_append0.sprintf("[INFO] Doosan Robot is already connected!!");
+    //     ui->textEdit_connect_log->append(text_for_append0);       
+    //     return;
+    // }
+    const char *command_0 = "gnome-terminal --tab -- /bin/bash -c 'rosrun plantfarm_ui dsr_control_node; exec bash'";
+
+    QString text_for_append;
+    text_for_append.sprintf("[INFO] Trying to connect Move Robot");
+    ui->textEdit_connect_log->append(text_for_append);
+    int result_0 = system(command_0);
+
+    if (result_0 == -1) {
+        // QString text_for_append;
+        text_for_append.sprintf("[ERROR] Failed to connect Move Robot");
+        ui->textEdit_connect_log->append(text_for_append);
+    } else {
+        // QString text_for_append;
+        text_for_append.sprintf("[INFO] Move Robot Node executed successfully.");
         ui->textEdit_connect_log->append(text_for_append);
     }
 }
@@ -1090,14 +1177,17 @@ void plantfarm_ui::on_pushButton_connect_rs_clicked()
     // }
 
     const char *command_0 = "gnome-terminal --tab -- /bin/bash -c 'roslaunch realsense2_camera rs_camera.launch align_depth:=true depth_width:=640 depth_height:=480 depth_fps:=30 color_width:=640 color_height:=480 color_fps:=30; exec bash'";
+    QString text_for_append;
+    text_for_append.sprintf("[INFO] Trying to connect Realsense");
+    ui->textEdit_connect_log->append(text_for_append);
+    int result_0 = system(command_0);   
     
-    int result_0 = system(command_0);
     if (result_0 == -1) {
-        QString text_for_append;
+        // QString text_for_append;
         text_for_append.sprintf("[ERROR] Failed to connect Realsense");
         ui->textEdit_connect_log->append(text_for_append);
     } else {
-        QString text_for_append;
+        // QString text_for_append;
         text_for_append.sprintf("[INFO] Realsense Node executed successfully.");
         ui->textEdit_connect_log->append(text_for_append);
     }
@@ -1111,16 +1201,19 @@ void plantfarm_ui::on_pushButton_connect_yolo_clicked()
     //     ui->textEdit_connect_log->append(text_for_append0);       
     //     return;
     // }
-
+    
     const char *command_0 = "gnome-terminal --tab -- /bin/bash -c 'rosrun yolov5 src/seg/segment/predict_ui.py; exec bash'";
-
+    QString text_for_append;
+    text_for_append.sprintf("[INFO] Trying to connect Yolo");
+    ui->textEdit_connect_log->append(text_for_append);
     int result_0 = system(command_0);
+   
     if (result_0 == -1) {
-        QString text_for_append;
+        // QString text_for_append;
         text_for_append.sprintf("[ERROR] Failed to connect Yolo");
         ui->textEdit_connect_log->append(text_for_append);
     } else {
-        QString text_for_append;
+        // QString text_for_append;
         text_for_append.sprintf("[INFO] YOLO Node executed successfully.");
         ui->textEdit_connect_log->append(text_for_append);
     }
@@ -1167,8 +1260,16 @@ void plantfarm_ui::on_pushButton_process_move_home_clicked()
     QString text_for_append;
     text_for_append.sprintf("[INFO] Move to home position!!!");
     ui->textEdit_process_log->append(text_for_append);
-    movej(joint_home,0,0,4.5,0,0,0,0);
+    movej(joint_home,0,0,4.5,0,0,0,0); 
+    wait(4.8);
+    // while(moveOnce) ros::spinOnce();
     movel(pos_home,velx,accx,4.5,0,0,0,0,0);
+    wait(4.8);
+    // while(true) {
+    //     std::lock_guard<std::mutex> lock(mtx);
+    //     if(!moveOnce) break;
+    //     spinOnce();
+    // }
 }
 
 
@@ -1177,7 +1278,9 @@ void plantfarm_ui::on_pushButton_process_get_image_clicked()
     QString text_for_append;
     text_for_append.sprintf("[INFO] Get detected image!!!");
     ui->textEdit_process_log->append(text_for_append);
-    cv::Mat showimage = yolo_image.clone();
+    cv::Mat showimage_bgr = yolo_image.clone();
+    cv::Mat showimage;
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
     cv::resize(showimage, showimage, cv::Size(640, 480));
     ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 }
@@ -1189,34 +1292,59 @@ void plantfarm_ui::on_pushButton_process_get_coord_clicked()
     QString text_for_append;
     text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
     ui->textEdit_process_log->append(text_for_append);
-}
 
-void plantfarm_ui::on_pushButton_process_move_robot_clicked()
-{
+    text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
+    ui->textEdit_process_log->append(text_for_append);
+
     float velx[2] = {0,0};
     float accx[2] = {0,0};
     float target[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
 
     // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
+    movel(target,velx,accx,4.5,0,0,0,0,0);
+    wait(4.5);
+
+    cv::Mat showimage_bgr = yolo_image.clone();
+    cv::Mat showimage;
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+
+}
+
+void plantfarm_ui::on_pushButton_process_move_robot_clicked()
+{
     QString text_for_append;
     text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
     ui->textEdit_process_log->append(text_for_append);
 
+    float velx[2] = {0,0};
+    float accx[2] = {0,0};
+    float target[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
+
+    // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
     movel(target,velx,accx,4.5,0,0,0,0,0);
-
+    wait(4.5);
     // ros::Rate rate(1.0);  
     // rate.sleep();
 
-    // float target_tool[6] = {calculated_tool_coord[0], calculated_tool_coord[1], calculated_tool_coord[2], calculated_tool_coord[3], calculated_tool_coord[4], calculated_tool_coord[5]};
-    // QString text_for_append0;
-    // text_for_append0.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_tool[0], target_tool[1], target_tool[2], target_tool[3], target_tool[4], target_tool[5]);
-    // ui->textEdit_process_log->append(text_for_append0);
-    // QString text_for_append1;
-    // text_for_append1.sprintf("[INFO] Move to target position!!!");
-    // ui->textEdit_process_log->append(text_for_append1);
-    // // movel(target_tool,velx,accx,4.5,0,0,0,0,0);
+    float target_tool[6] = {calculated_tool_coord[0], calculated_tool_coord[1], calculated_tool_coord[2], calculated_tool_coord[3], calculated_tool_coord[4], calculated_tool_coord[5]};
+    QString text_for_append0;
+    text_for_append0.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_tool[0], target_tool[1], target_tool[2], target_tool[3], target_tool[4], target_tool[5]);
+    ui->textEdit_process_log->append(text_for_append0);
+    QString text_for_append1;
+    text_for_append1.sprintf("[INFO] Move to target position!!!");
+    ui->textEdit_process_log->append(text_for_append1);
+
+    cv::Mat showimage_bgr = yolo_image.clone();
+    cv::Mat showimage;
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+
+    movel(target_tool,velx,accx,4.5,0,0,0,0,0);
 }
 
 
@@ -1246,6 +1374,12 @@ void plantfarm_ui::on_pushButton_process_move_robot2_clicked()
     text_for_append1.sprintf("[INFO] Move to target position!!!");
     ui->textEdit_process_log->append(text_for_append1);
     movel(target_tool,velx,accx,4.5,0,0,0,0,0);
+
+    cv::Mat showimage_bgr = yolo_image.clone();
+    cv::Mat showimage;
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 }
 
 // void plantfarm_ui::on_pushButton_haneye_calibration_home_clicked()

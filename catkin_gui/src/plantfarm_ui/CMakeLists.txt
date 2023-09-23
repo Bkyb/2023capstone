@@ -13,8 +13,10 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   dsr_msgs
   plantfarm_msg
+  actionlib_msgs 
+  actionlib
 )
-
+find_package(actionlib REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5PrintSupport REQUIRED)
 find_package(yaml-cpp REQUIRED)
@@ -49,9 +51,17 @@ set(EXTERNAL_DEPENDS_LIB
   yaml-cpp
   )
 
+add_action_files(
+  DIRECTORY ../plantfarm_msg/action   # 액션 메시지 파일이 있는 디렉토리를 지정
+  FILES
+  dsr_moveline.action
+  dsr_movejoint.action
+)
+
 generate_messages(
   DEPENDENCIES
   std_msgs
+  actionlib_msgs 
   plantfarm_msg
 )
 
@@ -137,4 +147,9 @@ install(TARGETS ${EXECUTABLES_LIST}
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
 )
+
+#
+add_executable(dsr_control_node script/dsr_control_node.cpp)
+target_link_libraries(dsr_control_node ${catkin_LIBRARIES} ${EXTERNAL_DEPENDS_LIB})
+add_dependencies(dsr_control_node ${catkin_EXPORTED_TARGETS})
 

@@ -10,7 +10,9 @@
 #include <ros/package.h>
 #include <boost/array.hpp>
 #include <Eigen/Dense>
+#include <chrono>
 #include <thread>
+#include <mutex>
 #include <tf/transform_listener.h>
 //Realsense
 #include <librealsense2/rs.hpp>
@@ -27,6 +29,7 @@
 #include <ros/ros.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Int16.h>
+#include <std_msgs/Bool.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -34,6 +37,9 @@
 #include <plantfarm_msg/YoloResultList.h>
 #include <plantfarm_msg/YoloKPT.h>
 #include <visualization_msgs/Marker.h>
+#include <plantfarm_msg/dsr_movejointAction.h>
+#include <plantfarm_msg/dsr_movelineAction.h>
+#include <actionlib/client/simple_action_client.h>
 // OpenCV Headers
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc.hpp>
@@ -131,6 +137,8 @@ public:
     ros::Subscriber empty_sub_;
     ros::Subscriber robot_state_sub_;
     ros::Subscriber detected_num_sub_;
+    ros::Subscriber is_yolo_died_sub_;
+    ros::Subscriber dsr_state_sub_;
     // subscriber nodes
 
     ros::Publisher pointcloud_pub;    // pointcloud
@@ -144,8 +152,9 @@ public:
     ros::ServiceClient get_current_rotm_client;
     //service nodes
 
-    int movel(float fTargetPos[6], float fTargetVel[2], float fTargetAcc[2], float fTargetTime, float fBlendingRadius, int nMoveReference, int nMoveMode, int nBlendingType, int nSyncType);
-    int movej(float fTargetPos[6], float fTargetVel, float fTargetAcc, float fTargetTime, float fBlendingRadius, int nMoveMode, int nBlendingType, int nSyncType);
+    void wait(float time_);
+    void movel(float fTargetPos[6], float fTargetVel[2], float fTargetAcc[2], float fTargetTime, float fBlendingRadius, int nMoveReference, int nMoveMode, int nBlendingType, int nSyncType);
+    void movej(float fTargetPos[6], float fTargetVel, float fTargetAcc, float fTargetTime, float fBlendingRadius, int nMoveMode, int nBlendingType, int nSyncType);
     // for moving robot
 
     void calculateEnd2Base(float& x, float& y, float& z, float& r, float& p, float& yw);
@@ -163,6 +172,11 @@ public:
     void yolo_kpt_cb(const plantfarm_msg::YoloKPTPtr &yolo_kpt);
     void empty_cb(const std_msgs::EmptyPtr &empty);
     void detect_num_cb(const std_msgs::Int16 &int_16);
+    void is_yolo_died_cb(const std_msgs::Bool &bool_);
+    void dsr_state_cb(const dsr_msgs::RobotState &msg);
+    void movej_done_cb(const actionlib::SimpleClientGoalState &state, const plantfarm_msg::dsr_movejointResultConstPtr &result);
+    void movel_done_cb(const actionlib::SimpleClientGoalState &state, const plantfarm_msg::dsr_movelineResultConstPtr &result);
+
 
     // callback functions
 
@@ -197,7 +211,8 @@ public:
     std::vector<std::vector<cv::Point>> kpt;
     std::vector<std::vector<cv::Point>> kpt2;
     int image_w, image_h;
-    int detect_leaves_num;
+    int detect_leaves_num, RobotState;
+    bool isYoloDied;
 
 
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (pcl::PointCloud<pcl::PointXYZRGB>);
@@ -221,6 +236,7 @@ public:
 
 private slots:
     void spinOnce();
+    
 
     //콜백함수에서 호출되는 함수
     
@@ -235,6 +251,8 @@ private slots:
     void on_pushButton_connect_clicked();
 
     void on_pushButton_connect_dsr_clicked();
+
+    void on_pushButton_connect_dsr_con_clicked();
 
     void on_pushButton_connect_rs_clicked();
 

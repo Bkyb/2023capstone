@@ -1,0 +1,16 @@
+# Action Definition for Moving Joints
+float64[6] pos               # Target joint angle list [degree] 
+float64    vel               # Set velocity: [deg/sec]
+float64    acc               # Set acceleration: [deg/sec2]
+float64    time              # Time [sec] 
+float64    radius            # Radius under blending mode [mm] 
+int8       mode              # MOVE_MODE_ABSOLUTE=0, MOVE_MODE_RELATIVE=1 
+int8       blendType         # BLENDING_SPEED_TYPE_DUPLICATE=0, BLENDING_SPEED_TYPE_OVERRIDE=1
+int8       syncType          # SYNC = 0, ASYNC = 1
+---
+# Result
+bool success
+---
+# Feedback
+bool success
+
