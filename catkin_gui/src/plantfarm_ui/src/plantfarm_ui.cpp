@@ -25,7 +25,7 @@ plantfarm_ui::plantfarm_ui(QWidget *parent) :
     yolo_image_sub_ = n->subscribe("/yolov7/image0", 1000, &plantfarm_ui::yolo_image_sub_cb, this);
     color_image_sub_ = n->subscribe("/camera/color/image_raw", 1000, &plantfarm_ui::color_image_sub_cb, this);
     depth_image_sub_ = n->subscribe("/camera/aligned_depth_to_color/image_raw", 1000, &plantfarm_ui::depth_image_sub_cb, this);
-    depth_image_16_sub_ = n->subscribe("/camera/aligned_depth_to_color/image_raw", 1000, &plantfarm_ui::depth_image_16_sub_cb, this);
+    // depth_image_16_sub_ = n->subscribe("/camera/aligned_depth_to_color/image_raw", 1000, &plantfarm_ui::depth_image_16_sub_cb, this);
     //color_image_sub_ = n->subscribe("/camera/color/image_raw", 1000, &plantfarm_ui::color_image_sub_cb, this);
     color_camera_info_sub_ = n->subscribe("/camera/color/camera_info", 1000, &plantfarm_ui::color_camera_info_sub_cb, this);
     yolo_sub_ = n->subscribe("/yolov7/result", 10, &plantfarm_ui::yolo_cb, this);
@@ -222,6 +222,49 @@ void plantfarm_ui::movel(float *fTargetPos, float *fTargetVel, float *fTargetAcc
     
 }
 
+int plantfarm_ui::set_digital_output(int nGpioIndex, bool bGpioValue)
+{
+    ros::NodeHandlePtr node = boost::make_shared<ros::NodeHandle>();
+    ros::ServiceClient srvSetCtrlBoxDigitalOutput = node->serviceClient<dsr_msgs::SetCtrlBoxDigitalOutput>("/dsr01m1013/io/set_digital_output");
+    dsr_msgs::SetCtrlBoxDigitalOutput srv;
+
+    srv.request.index = nGpioIndex;
+    srv.request.value = bGpioValue;
+    
+    if(srvSetCtrlBoxDigitalOutput.call(srv))
+    {         
+        //ROS_INFO("receive srv, srv.response.success: %ld\n", (long int)srv.response.success);
+        return (srv.response.success);
+    }
+    else
+    {    
+        ui->textEdit_log->append("Failed to call service dr_control_service : set_digital_output\n");
+        ros::shutdown();  
+        return -1;
+    }
+    return 0;
+}
+
+void plantfarm_ui::move_gripper(int state)
+{
+    //state 0 -> off, state 1 -> on, else -> stop
+    if(state == 0)
+    {
+        set_digital_output(1,true);
+        set_digital_output(2,false);
+    }
+    else if(state == 1)
+    {
+        set_digital_output(1,false);
+        set_digital_output(2,true);        
+    }
+    else
+    {
+        set_digital_output(1,false);
+        set_digital_output(2,false);  
+    }
+}
+
 void plantfarm_ui::movej_done_cb(const actionlib::SimpleClientGoalState &state, const plantfarm_msg::dsr_movejointResultConstPtr &result)
 {
     ui->textEdit_log->append("  Failed to call service dr_control_service : move_joint"); 
@@ -271,22 +314,15 @@ void plantfarm_ui::color_image_sub_cb(const sensor_msgs::Image::ConstPtr &image_
 
 void plantfarm_ui::depth_image_sub_cb(const sensor_msgs::Image::ConstPtr &image_raw)
 {
-  cv_bridge::CvImagePtr cv_ptr;
-  cv_ptr = cv_bridge::toCvCopy(image_raw, sensor_msgs::image_encodings::TYPE_16UC1);
-  cv_ptr->image.convertTo(depth_image, CV_32F, 0.001);
-
-}
-
-void plantfarm_ui::depth_image_16_sub_cb(const sensor_msgs::Image::ConstPtr  &depth)  //realsense callback
-{
-    // read depth image
-    cv_bridge::CvImagePtr depth_ptr;  // opencv 형태로 변환
+    cv_bridge::CvImagePtr cv_ptr;
     try
-    {
-        depth_ptr = cv_bridge::toCvCopy(depth, sensor_msgs::image_encodings::TYPE_16UC1);
+    {    
+        cv_ptr = cv_bridge::toCvCopy(image_raw, sensor_msgs::image_encodings::TYPE_16UC1);
+        // depth_ptr = cv_bridge::toCvCopy(image_raw, sensor_msgs::image_encodings::TYPE_16UC1);
         // 16-bit의 회색조 이미지로 Depth이미지를 opencv형태로 받아옴
         // depth image 형식 => cv::Mat depth_image; 
-        depth_image_16 = depth_ptr->image;
+        depth_image_16 = cv_ptr->image;
+        cv_ptr->image.convertTo(depth_image, CV_32F, 0.001);
     }
     catch(cv_bridge::Exception& e)
     {
@@ -294,7 +330,28 @@ void plantfarm_ui::depth_image_16_sub_cb(const sensor_msgs::Image::ConstPtr  &de
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
+
+
 }
+
+// void plantfarm_ui::depth_image_16_sub_cb(const sensor_msgs::Image::ConstPtr  &depth)  //realsense callback
+// {
+//     // read depth image
+//     cv_bridge::CvImagePtr depth_ptr;  // opencv 형태로 변환
+//     try
+//     {
+//         depth_ptr = cv_bridge::toCvCopy(depth, sensor_msgs::image_encodings::TYPE_16UC1);
+//         // 16-bit의 회색조 이미지로 Depth이미지를 opencv형태로 받아옴
+//         // depth image 형식 => cv::Mat depth_image; 
+//         depth_image_16 = depth_ptr->image;
+//     }
+//     catch(cv_bridge::Exception& e)
+//     {
+//         // e.what으로 예외에 관한 내용을 저장하는 문자열 필드 값을 들여다 볼 수 있음
+//         ROS_ERROR("cv_bridge exception: %s", e.what());
+//         return;
+//     }
+// }
 
 void plantfarm_ui::color_camera_info_sub_cb(const sensor_msgs::CameraInfoConstPtr &depth_camera_info)
 {
@@ -393,6 +450,7 @@ void plantfarm_ui::yolo_kpt_cb(const plantfarm_msg::YoloKPTPtr &yolo_kpt)
 void plantfarm_ui::empty_cb(const std_msgs::EmptyPtr &empty)
 {
     // pool.push_task(&SeperateAbnormal::image_pipeline, this, depth_image, abnormal_contours);
+    
     image_pipeline(depth_image_16, abnormal_contours, kpt);
 }
 
@@ -560,12 +618,22 @@ pcl::PointCloud<pcl::PointXYZ> plantfarm_ui::depth_to_pointcloud(cv::Mat depth_i
 cv::Mat plantfarm_ui::dot_kpt_mask(cv::Mat &depth_image, std::vector<std::vector<cv::Point>> contour, std::vector<std::vector<cv::Point>> kpt, int idx)
 {
     cv::Mat kpt_mask = cv::Mat::zeros(depth_image.size(), CV_16UC1);
-    drawContours(kpt_mask, kpt, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
+    try {
+        drawContours(kpt_mask, kpt, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
+    } catch (const cv::Exception& e) {
+        // Handle or report error
+        std::cerr << "OpenCV Error: " << e.what() << std::endl;
+    }    
     cv::Mat abnormal_depth_kpt = cv::Mat::zeros(kpt_mask.size(), CV_16UC1);
     cv::bitwise_and(depth_image, kpt_mask, abnormal_depth_kpt);
 
     cv::Mat contour_mask = cv::Mat::zeros(depth_image.size(), CV_16UC1);
-    drawContours(contour_mask, contour, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
+    try {
+        drawContours(contour_mask, contour, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
+    } catch (const cv::Exception& e) {
+        // Handle or report error
+        std::cerr << "OpenCV Error: " << e.what() << std::endl;
+    }    
     cv::erode(contour_mask, contour_mask, cv::Mat(), cv::Point(-1, -1), 4);
     cv::Mat abnormal_depth = cv::Mat::zeros(contour_mask.size(), CV_16UC1);
     cv::bitwise_and(depth_image, contour_mask, abnormal_depth);
@@ -639,11 +707,19 @@ cv::Mat plantfarm_ui::make_contour_mask(cv::Mat &depth_image, std::vector<std::v
     cv::Mat contour_mask = cv::Mat::zeros(depth_image.size(), CV_16UC1);
 
     cv::Mat kpt_mask = cv::Mat::zeros(depth_image.size(), CV_16UC1);
-
-    drawContours(contour_mask, contour, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
+    try {
+        drawContours(contour_mask, contour, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
+    } catch (const cv::Exception& e) {
+        // Handle or report error
+        std::cerr << "OpenCV Error: " << e.what() << std::endl;
+    }  
     // cv::imshow("contour_mask", contour_mask);
-    drawContours(kpt_mask, kpt, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
-
+    try {
+        drawContours(kpt_mask, kpt, idx, cv::Scalar(int(std::pow(2,16)-1)), -1);
+    } catch (const cv::Exception& e) {
+        // Handle or report error
+        std::cerr << "OpenCV Error: " << e.what() << std::endl;
+    }  
     // cv::Mat erode_mask = cv::Mat::zeros(depth_image.size(), CV_16UC1);;
     // cv::bitwise_and(contour_mask);
     // cv::imshow("contour_mask0", contour_mask);
@@ -673,6 +749,7 @@ void plantfarm_ui::image_pipeline(cv::Mat depth_image, std::vector<std::vector<c
     if(kpt.empty()) return;
     // if(kpt2.empty()) return;
     if(detect_leaves_num != 1) return;
+    ROS_INFO("%d",detect_leaves_num);
     // if(isYoloDied) return;
     for(int i=0; i<contours.size(); i++)
     {
@@ -838,12 +915,12 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     cv::Matx31d rotatedVector = rotation * cv::Matx31d(0.0, 0.0, -200.0);
     cv::Point3d finalPosition(rotatedVector(0, 0) , rotatedVector(1, 0) , rotatedVector(2, 0) );
 
-    // cv::Matx44d T_aruco2(
-    //   static_cast<double>(rotation(0, 0)), static_cast<double>(rotation(0, 1)), static_cast<double>(rotation(0, 2)), finalPosition.x + targetPosition.x,
-    //   static_cast<double>(rotation(1, 0)), static_cast<double>(rotation(1, 1)), static_cast<double>(rotation(1, 2)), finalPosition.y + targetPosition.y,
-    //   static_cast<double>(rotation(2, 0)), static_cast<double>(rotation(2, 1)), static_cast<double>(rotation(2, 2)), compute_normalfinalPosition.z + targetPosition.z,
-    //   0.0, 0.0, 0.0, 1.0
-    // );
+    cv::Matx44d T_cent(
+      static_cast<double>(rotation(0, 0)), static_cast<double>(rotation(0, 1)), static_cast<double>(rotation(0, 2)), finalPosition.x + targetPosition.x,
+      static_cast<double>(rotation(1, 0)), static_cast<double>(rotation(1, 1)), static_cast<double>(rotation(1, 2)), finalPosition.y + targetPosition.y,
+      static_cast<double>(rotation(2, 0)), static_cast<double>(rotation(2, 1)), static_cast<double>(rotation(2, 2)), finalPosition.z + targetPosition.z,
+      0.0, 0.0, 0.0, 1.0
+    );
 
     // cv::Matx44d T_aruco2(
     //   static_cast<double>(rotation(0, 0)), static_cast<double>(rotation(0, 1)), static_cast<double>(rotation(0, 2)), finalPosition.x + centroid1(0)*1000,
@@ -851,7 +928,7 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     //   static_cast<double>(rotation(2, 0)), static_cast<double>(rotation(2, 1)), static_cast<double>(rotation(2, 2)), finalPosition.z + centroid1(2)*1000,
     //   0.0, 0.0, 0.0, 1.0
     // );
-    cv::Matx44d T_aruco2(
+    cv::Matx44d T_leaf(
         static_cast<double>(rotation(0, 0)), static_cast<double>(rotation(0, 1)), static_cast<double>(rotation(0, 2)), finalPosition.x + moved_point.x*1000,
         static_cast<double>(rotation(1, 0)), static_cast<double>(rotation(1, 1)), static_cast<double>(rotation(1, 2)), finalPosition.y + moved_point.y*1000,
         static_cast<double>(rotation(2, 0)), static_cast<double>(rotation(2, 1)), static_cast<double>(rotation(2, 2)), finalPosition.z + moved_point.z*1000,
@@ -867,7 +944,8 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
             T_end2camera2(i, j) = eigenInverse(i, j);
 
     // end effector의 위치 추출
-    cv::Matx44d T_end2base2 = T_aruco2 * T_end2camera2;
+    cv::Matx44d T_end2base2 = T_cent * T_end2camera2;
+    // cv::Matx44d T_end2base2 = T_leaf * T_end2camera2;
     xxx = T_end2base2(0, 3);
     yyy = T_end2base2(1, 3);
     zzz = T_end2base2(2, 3);// + 250;
@@ -921,9 +999,15 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
         for (int j = 0; j < 4; ++j)
             camera2base22(i, j) = camera2base(i, j);
 
+    // cv::Matx44d c2t(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+    //                 0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+    //                 0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.10500000e+00,
+    //                 0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00); 
+
+    
     cv::Matx44d c2t(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
                     0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.105000000,
+                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.10500000e+03,
                     0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00); 
 
     // Convert cv::Matx44d to Eigen::Matrix4d
@@ -936,14 +1020,14 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
 
     Eigen::Matrix4d eigenInverse2 = eigenMatrix.inverse();
 
-    cv::Matx44d T_end2camera;
+    cv::Matx44d T_end2tool;
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j)
-            T_end2camera(i, j) = eigenInverse2(i, j);
+            T_end2tool(i, j) = eigenInverse2(i, j);
 
 
-
-    cv::Matx44d T_end2base = camera2base22*T_end2camera;
+    // cv::Matx44d T_end2base = camera2base22* T_end2tool;
+    cv::Matx44d T_end2base = T_leaf * T_end2tool;
 
     x = T_end2base(0, 3);
     y = T_end2base(1, 3);
@@ -983,7 +1067,8 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     std::cout << "task2: r,p,y: " << std::endl
             << r<< ", "<<p<< ", "<<yw << std::endl;
 
-    calculated_tool_coord[0] = x * 1000.0; calculated_tool_coord[1] = y * 1000.0; calculated_tool_coord[2] = z * 1000.0;
+    calculated_tool_coord[0] = x; calculated_tool_coord[1] = y; calculated_tool_coord[2] = z;
+    // calculated_tool_coord[0] = x * 1000; calculated_tool_coord[1] = y * 1000; calculated_tool_coord[2] = z * 1000;
     calculated_tool_coord[3] = r; calculated_tool_coord[4] = p; calculated_tool_coord[5] = yw;
 
   
@@ -1313,22 +1398,89 @@ void plantfarm_ui::on_pushButton_process_get_coord_clicked()
 
 }
 
-void plantfarm_ui::on_pushButton_process_move_robot_clicked()
+void plantfarm_ui::on_pushButton_process_move_auto_clicked()
 {
+
+    float joint_home[6] = {90.0, 0.0, 90.0, 0.0, 90.0, 0.0};
+    float pos_home[6] = {650, 440, 665, 0.0, 180.0, 0.0};
+    float velx[2] = {0,0};
+    float accx[2] = {0,0};
+    
     QString text_for_append;
+    
+    text_for_append.sprintf("[INFO] Move to home position!!!");
+    ui->textEdit_process_log->append(text_for_append);
+    movej(joint_home,0,0,4.5,0,0,0,0); 
+    wait(4.8);
+
+    movel(pos_home,velx,accx,4.5,0,0,0,0,0);
+    wait(4.8);
+
+    ////////////////////////////////////////////////////////////////////////
+
+    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord[i];
+
+    text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
+    ui->textEdit_process_log->append(text_for_append);
+
     text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
     ui->textEdit_process_log->append(text_for_append);
 
-    float velx[2] = {0,0};
-    float accx[2] = {0,0};
+
     float target[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
 
     // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
     movel(target,velx,accx,4.5,0,0,0,0,0);
-    wait(4.5);
-    // ros::Rate rate(1.0);  
-    // rate.sleep();
+    wait(4.6);
+
+    cv::Mat showimage_bgr = yolo_image.clone();
+    cv::Mat showimage;
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+
+    ////////////////////////////////////////////////////////////////////////////
+    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord[i];
+
+    text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
+    ui->textEdit_process_log->append(text_for_append);
+
+    text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
+    ui->textEdit_process_log->append(text_for_append);
+
+    float target2[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
+
+    // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
+    
+    movel(target2,velx,accx,4.5,0,0,0,0,0);
+    wait(4.6);
+
+    showimage_bgr = yolo_image.clone();
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+    ////////////////////////////////////////////////////////
+    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord[i];
+
+    text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
+    ui->textEdit_process_log->append(text_for_append);
+
+    text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
+    ui->textEdit_process_log->append(text_for_append);
+
+    float target3[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
+
+    // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
+    
+    movel(target3,velx,accx,4.5,0,0,0,0,0);
+    wait(4.6);
+
+    showimage_bgr = yolo_image.clone();
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+
 
     float target_tool[6] = {calculated_tool_coord[0], calculated_tool_coord[1], calculated_tool_coord[2], calculated_tool_coord[3], calculated_tool_coord[4], calculated_tool_coord[5]};
     QString text_for_append0;
@@ -1337,9 +1489,9 @@ void plantfarm_ui::on_pushButton_process_move_robot_clicked()
     QString text_for_append1;
     text_for_append1.sprintf("[INFO] Move to target position!!!");
     ui->textEdit_process_log->append(text_for_append1);
+    
 
-    cv::Mat showimage_bgr = yolo_image.clone();
-    cv::Mat showimage;
+    showimage_bgr = yolo_image.clone();
     cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
     cv::resize(showimage, showimage, cv::Size(640, 480));
     ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
@@ -1348,7 +1500,7 @@ void plantfarm_ui::on_pushButton_process_move_robot_clicked()
 }
 
 
-void plantfarm_ui::on_pushButton_process_move_robot2_clicked()
+void plantfarm_ui::on_pushButton_process_move_robot_clicked()
 {
     float velx[2] = {0,0};
     float accx[2] = {0,0};
@@ -1380,6 +1532,15 @@ void plantfarm_ui::on_pushButton_process_move_robot2_clicked()
     cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
     cv::resize(showimage, showimage, cv::Size(640, 480));
     ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+}
+
+void plantfarm_ui::on_pushButton_process_move_gripper_clicked()
+{
+    //state 0 -> off, state 1 -> on, else -> stop
+
+    move_gripper(0);
+    wait(0.2);
+    move_gripper(1);
 }
 
 // void plantfarm_ui::on_pushButton_haneye_calibration_home_clicked()

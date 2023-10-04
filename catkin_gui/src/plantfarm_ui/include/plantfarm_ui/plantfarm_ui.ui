@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>1</number>
+    <number>4</number>
    </property>
    <widget class="QWidget" name="widget_home">
     <widget class="QPushButton" name="pushButton_calibration">
@@ -700,7 +700,7 @@ parameter</string>
     <widget class="QPushButton" name="pushButton_process_get_image">
      <property name="geometry">
       <rect>
-       <x>140</x>
+       <x>160</x>
        <y>520</y>
        <width>91</width>
        <height>31</height>
@@ -713,7 +713,7 @@ parameter</string>
     <widget class="QPushButton" name="pushButton_process_get_coord">
      <property name="geometry">
       <rect>
-       <x>260</x>
+       <x>300</x>
        <y>520</y>
        <width>121</width>
        <height>31</height>
@@ -759,7 +759,7 @@ parameter</string>
      <property name="geometry">
       <rect>
        <x>560</x>
-       <y>560</y>
+       <y>580</y>
        <width>89</width>
        <height>25</height>
       </rect>
@@ -768,17 +768,17 @@ parameter</string>
       <string>HOME</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="pushButton_process_move_robot">
+    <widget class="QPushButton" name="pushButton_process_move_auto">
      <property name="geometry">
       <rect>
-       <x>410</x>
-       <y>520</y>
+       <x>10</x>
+       <y>580</y>
        <width>101</width>
        <height>31</height>
       </rect>
      </property>
      <property name="text">
-      <string>move robot</string>
+      <string>auto</string>
      </property>
     </widget>
     <widget class="QPushButton" name="pushButton_process_move_home">
@@ -794,10 +794,10 @@ parameter</string>
       <string>move home</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="pushButton_process_move_robot2">
+    <widget class="QPushButton" name="pushButton_process_move_robot">
      <property name="geometry">
       <rect>
-       <x>540</x>
+       <x>470</x>
        <y>520</y>
        <width>101</width>
        <height>31</height>
@@ -805,6 +805,19 @@ parameter</string>
      </property>
      <property name="text">
       <string>move robot</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_move_gripper">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>580</y>
+       <width>91</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>gripper</string>
      </property>
     </widget>
    </widget>

@@ -93,7 +93,7 @@
 #include <dsr_msgs/GetCurrentPose.h>
 #include <dsr_msgs/GetCurrentPosx.h>
 #include <dsr_msgs/GetCurrentRotm.h>
-
+#include <dsr_msgs/SetCtrlBoxDigitalOutput.h>
 
 
 
@@ -155,6 +155,8 @@ public:
     void wait(float time_);
     void movel(float fTargetPos[6], float fTargetVel[2], float fTargetAcc[2], float fTargetTime, float fBlendingRadius, int nMoveReference, int nMoveMode, int nBlendingType, int nSyncType);
     void movej(float fTargetPos[6], float fTargetVel, float fTargetAcc, float fTargetTime, float fBlendingRadius, int nMoveMode, int nBlendingType, int nSyncType);
+    int set_digital_output(int nGpioIndex, bool bGpioValue);
+    void move_gripper(int state);
     // for moving robot
 
     void calculateEnd2Base(float& x, float& y, float& z, float& r, float& p, float& yw);
@@ -164,7 +166,7 @@ public:
     void yolo_image_sub_cb(const sensor_msgs::Image::ConstPtr &image_raw);
     void color_image_sub_cb(const sensor_msgs::Image::ConstPtr &image_raw);
     void depth_image_sub_cb(const sensor_msgs::Image::ConstPtr &image_raw);
-    void depth_image_16_sub_cb(const sensor_msgs::Image::ConstPtr &image_raw);
+    // void depth_image_16_sub_cb(const sensor_msgs::Image::ConstPtr &image_raw);
     void color_camera_info_sub_cb(const sensor_msgs::CameraInfoConstPtr &depth_camera_info);
     void pointcloud_sub_cb(const sensor_msgs::PointCloud2ConstPtr &pointcloud_raw);
     pcl::PointCloud<pcl::PointXYZRGB> cloudmsg2cloud(sensor_msgs::PointCloud2 cloudmsg);
@@ -270,7 +272,9 @@ private slots:
 
     void on_pushButton_process_move_home_clicked();
     
-    void on_pushButton_process_move_robot2_clicked();
+    void on_pushButton_process_move_auto_clicked();
+
+    void on_pushButton_process_move_gripper_clicked();
 
     // void on_pushButton_currentPosx_clicked();
 
