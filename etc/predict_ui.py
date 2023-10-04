@@ -28,7 +28,7 @@ Usage - formats:
 
 # 추가이용
 import rospy
-from std_msgs.msg import Int16
+from std_msgs.msg import Int16, Bool
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from yolov5.msg import YoloResult, YoloResultList, YoloKPT
@@ -432,7 +432,7 @@ def parse_opt():
     parser.add_argument('--source', type=str, default='/camera/aligned_depth_to_color/image_raw', help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='(optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
-    parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.35, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
@@ -464,12 +464,23 @@ def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
+def shutdown():
+    print("shutdown time!")
+    print("shutdown time!")
+    print("shutdown time!")
+
+    pub_stop.publish(True)
+    return 0
+
 
 if __name__ == "__main__":
     node_name = os.path.basename(sys.argv[0]).split('.')[0]
     rospy.init_node(node_name)
-    pub_res=rospy.Publisher('/yolov7/result', YoloResultList, queue_size=10)
-    pub_res_kpt=rospy.Publisher('/yolov8_kpt/result', YoloKPT, queue_size=1)
+    rospy.on_shutdown(shutdown)
+
+    pub_res = rospy.Publisher('/yolov7/result', YoloResultList, queue_size=10)
+    pub_res_kpt = rospy.Publisher('/yolov8_kpt/result', YoloKPT, queue_size=1)
+    pub_stop = rospy.Publisher('/yolov7/isshutdown', Bool, queue_size=1)
     
     opt = parse_opt()
     main(opt)
