@@ -184,7 +184,14 @@ void plantfarm_ui::movel(float *fTargetPos, float *fTargetVel, float *fTargetAcc
 
     ui->textEdit_log->append("Move_line START!");
     
+    if(fTargetPos[2] < 200.0) 
+    {
+        ui->textEdit_log->append("Unexpected Pose!");
+        return;
+    }
+
     plantfarm_msg::dsr_movelineGoal goal;
+    
     
     for(int i=0; i<6; i++)
         goal.pos[i] = fTargetPos[i];
@@ -760,10 +767,15 @@ void plantfarm_ui::image_pipeline(cv::Mat depth_image, std::vector<std::vector<c
         pcl::PointCloud<pcl::PointXYZ> cloud = depth_to_pointcloud(abnormal_depth);
         pcl::PointCloud<pcl::PointXYZ> cloud2 = depth_to_pointcloud(abnormal_depth2);
         pcl::PointCloud<pcl::PointXYZ> cloud4 = depth_to_pointcloud(abnormal_depth4);
+        
+        cv::Point pointFromKpt = kpt[0][0];  // i와 j는 원하는 인덱스입니다.
+        cv::Point pointFromKpt2 = kpt2[0][0];  // 동일한 인덱스를 사용하거나 다른 인덱스를 사용할 수 있습니다.
+        cv::Point direction = pointFromKpt2 - pointFromKpt;
+
 
         publish_pointcloud(cloud2);
         // print_pc(cloud2);
-        abnormal_pointcloud(cloud, cloud2, cloud4);
+        abnormal_pointcloud(cloud, cloud2, cloud4, direction);
 
         // centroid_move(cloud2, cloud4);
 
@@ -796,7 +808,7 @@ pcl::PointXYZ plantfarm_ui::move_point_towards(const pcl::PointCloud<pcl::PointX
 }
 
 void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base, Eigen::Matrix4d camera2endeffector, Eigen::Matrix4d endeffector2base, Eigen::Matrix<float, 4, 1> centroid_point2,
-                  Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point) {
+                  Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point, cv::Point direction) {
     
 
 
@@ -892,14 +904,19 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     normal_cv[1] = -normal_cv[1];
     normal_cv[2] = -normal_cv[2];
 
+    std::cout << "normal vector: : " << std::endl
+        << normal_cv[0]<< ", "<<normal_cv[1]<< ", "<<normal_cv[2]<< std::endl;
+
     cv::Vec3d up(0.0, 0.0, 1.0);
     cv::Vec3d axis = normal_cv.cross(up);
     double cosine = normal_cv.dot(up);
     double k = 1.0 / (1.0 + cosine);
-    
+
+    std::cout << "cosine: : " << std::endl
+        << cosine<< std::endl;    
     cv::Matx33d rotation;  // Use Matx33d
 
-    rotation(0, 0) = axis(0) * axis(0) * k + cosine;
+    rotation(0, 0) = axis(0) * axis(0) * k + cosine; // cos(t) + (1- cos(t) * nx ^2)
     rotation(1, 0) = axis(1) * axis(0) * k - axis(2);
     rotation(2, 0) = axis(2) * axis(0) * k + axis(1);
     rotation(0, 1) = axis(0) * axis(1) * k + axis(2);
@@ -910,9 +927,56 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     rotation(2, 2) = axis(2) * axis(2) * k + cosine;
 
 
+    double normDirection = cv::norm(direction);
+
+    // std::cout << "normDirection = " << normDirection  << std::endl;
+    // std::cout << "Direction: x = " << direction.x << "y =" << direction.y << std::endl;
+  
+    double normalizedDirection[2];
+
+    if(normDirection > 0)  // 0으로 나누는 것을 방지
+    {
+        normalizedDirection[0] = direction.x / normDirection;
+        normalizedDirection[1] = direction.y / normDirection;
+    }
+    else
+    {
+        normalizedDirection[0] = direction.x;
+        normalizedDirection[1] = direction.y;
+    }
+
+    // std::cout << "normalizedDirection: x = " << normalizedDirection[0] << "y =" << normalizedDirection[1] << std::endl;
+    // cv::Point vect{0,1};
+    double vect[2] = {0,1};
+    // cv::Point direction{2,3};
+
+    // 내적 계산
+    double dotProduct = vect[0] * normalizedDirection[0] + vect[1] * normalizedDirection[1];
+
+    // 두 벡터의 크기 계산
+    // double normVect = cv::norm(vect);
+    // double normNormalizedDirection = cv::norm(normalizedDirection);  // 이미 정규화 되어있기 때문에 항상 1일 것이다.
+
+    // cos(theta) 계산
+    double cosAngle = dotProduct;
+    
+    // 각도를 계산 (라디안에서 도로 변환)
+    double angleRadian = std::acos(cosAngle);
+    double angleDegree = angleRadian * (180.0 / CV_PI); // OpenCV에서는 CV_PI를 사용하여 π를 얻을 수 있다.
+
+    // std::cout << "Dot Product: " << dotProduct << std::endl;
+    // std::cout << "Cosine of angle: " << cosTheta << std::endl;
+    // std::cout << "Angle in radians: " << thetaRadian << std::endl;
+    // std::cout << "Angle in degrees: " << thetaDegree << std::endl;
+
+    double deltadegree = 180.0 - angleDegree;
+
+    float deltadegreeFloat = static_cast<float>(deltadegree);
+
+
     cv::Point3d targetPosition(centroid_point2[0] * 1000.0, centroid_point2[1] *1000.0, centroid_point2[2]*1000.0); 
-    cv::Point3d endEffectorPosition = cv::Point3d(0.0, 0.0, 200.0);//mm
-    cv::Matx31d rotatedVector = rotation * cv::Matx31d(0.0, 0.0, -200.0);
+    cv::Point3d endEffectorPosition = cv::Point3d(0.0, 0.0, 300.0);     //mm 10/05 200 -> 300으로 변경
+    cv::Matx31d rotatedVector = rotation * cv::Matx31d(0.0, 0.0, -300.0); // 10/05 200 -> 300으로 변경
     cv::Point3d finalPosition(rotatedVector(0, 0) , rotatedVector(1, 0) , rotatedVector(2, 0) );
 
     cv::Matx44d T_cent(
@@ -928,27 +992,152 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     //   static_cast<double>(rotation(2, 0)), static_cast<double>(rotation(2, 1)), static_cast<double>(rotation(2, 2)), finalPosition.z + centroid1(2)*1000,
     //   0.0, 0.0, 0.0, 1.0
     // );
-    cv::Matx44d T_leaf(
-        static_cast<double>(rotation(0, 0)), static_cast<double>(rotation(0, 1)), static_cast<double>(rotation(0, 2)), finalPosition.x + moved_point.x*1000,
-        static_cast<double>(rotation(1, 0)), static_cast<double>(rotation(1, 1)), static_cast<double>(rotation(1, 2)), finalPosition.y + moved_point.y*1000,
-        static_cast<double>(rotation(2, 0)), static_cast<double>(rotation(2, 1)), static_cast<double>(rotation(2, 2)), finalPosition.z + moved_point.z*1000,
-        0.0, 0.0, 0.0, 1.0
-    );
+    // cv::Matx44d T_leaf(
+    //     static_cast<double>(rotation(0, 0)), static_cast<double>(rotation(0, 1)), static_cast<double>(rotation(0, 2)), finalPosition.x + moved_point.x*1000,
+    //     static_cast<double>(rotation(1, 0)), static_cast<double>(rotation(1, 1)), static_cast<double>(rotation(1, 2)), finalPosition.y + moved_point.y*1000,
+    //     static_cast<double>(rotation(2, 0)), static_cast<double>(rotation(2, 1)), static_cast<double>(rotation(2, 2)), finalPosition.z + moved_point.z*1000,
+    //     0.0, 0.0, 0.0, 1.0
+    // );
 
-    float xxx, yyy, zzz, rrr, ppp, www;
+    float x1, y1, z1, r1, p1, w1;
 
     Eigen::Matrix4d eigenInverse = camera2endeffector.inverse();
-    cv::Matx44d T_end2camera2;
+    cv::Matx44d T_end2camera;
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j)
-            T_end2camera2(i, j) = eigenInverse(i, j);
+            T_end2camera(i, j) = eigenInverse(i, j);
 
     // end effector의 위치 추출
-    cv::Matx44d T_end2base2 = T_cent * T_end2camera2;
-    // cv::Matx44d T_end2base2 = T_leaf * T_end2camera2;
-    xxx = T_end2base2(0, 3);
-    yyy = T_end2base2(1, 3);
-    zzz = T_end2base2(2, 3);// + 250;
+    cv::Matx44d T_end2base = T_cent * T_end2camera;
+    // cv::Matx44d T_end2base = T_leaf * T_end2camera;
+    x1 = T_end2base(0, 3);
+    y1 = T_end2base(1, 3);
+    z1 = T_end2base(2, 3);// + 250;
+
+    // end effector의 방향 추출
+    cv::Matx33d R_end2base;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            R_end2base(i, j) = T_end2base(i, j);
+        }
+    }
+
+    // 초기화
+    double r_rad = 0;
+    // float p_rad = 180;
+    double yw_rad = 0;  
+
+    double p_rad = std::acos(R_end2base(2, 2));
+
+
+    if (R_end2base(1, 2) / std::sin(p_rad) > 0) {
+        r_rad = std::acos(R_end2base(0, 2) / std::sin(p_rad));
+    } else {
+        r_rad = -std::acos(R_end2base(0, 2) / std::sin(p_rad));
+    }
+    if (R_end2base(2, 1) / std::sin(p_rad) > 0) {
+        yw_rad = std::acos(-R_end2base(2, 0) / std::sin(p_rad));
+    } else {
+        yw_rad = -std::acos(-R_end2base(2, 0) / std::sin(p_rad));
+    }
+
+    r1 = r_rad * 180.0 / M_PI;
+    p1 = p_rad * 180.0 / M_PI;
+    w1 = yw_rad * 180.0 / M_PI;
+
+    calculated_cam_coord[0] = x1; calculated_cam_coord[1] = y1; calculated_cam_coord[2] = z1;
+    calculated_cam_coord[3] = r1; calculated_cam_coord[4] = p1; calculated_cam_coord[5] = w1;
+
+    std::cout << "task1: x,y,z: " << std::endl
+              << x1<< ", "<<y1<< ", "<<z1 << std::endl;
+    std::cout << "task1: r,p,y: " << std::endl
+              << r1<< ", "<<p1<< ", "<<w1 << std::endl;
+
+    // 타입 1 end
+
+
+    // 타입 2 
+    // 1st calculate z - y - z' rotation form rotation matrix 
+    // 2nd add delta theta and make rotation matrix again
+
+    float x2, y2, z2, r2, p2, w2;
+    // cv::Matx44d camera2baseCV;
+    // for (int i = 0; i < 4; ++i)
+    //     for (int j = 0; j < 4; ++j)
+    //         camera2baseCV(i, j) = camera2base(i, j);
+
+
+    // cv::Matx33d rotationC2B;
+    // for (int i = 0; i < 3; ++i)
+    //     for (int j = 0; j < 3; ++j)
+    //         rotationC2B(i, j) = camera2baseCV(i, j);
+
+    cv::Matx33d rotationC2B;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            rotationC2B(i, j) = camera2base(i, j);
+
+    double zRot = 0;
+    double zRot2 = 0;  
+    double yRot = std::acos(rotationC2B(2, 2));
+
+
+    if(std::sin(yRot) == 0.0)
+    {
+        zRot = 0.0; zRot2 = std::acos(rotationC2B(0,0)) - zRot;
+    }
+    else{
+        if (rotationC2B(1, 2) / std::sin(yRot) > 0) {
+            zRot = std::acos(rotationC2B(0, 2) / std::sin(yRot));
+        } else {
+            zRot = -std::acos(rotationC2B(0, 2) / std::sin(yRot));
+        }
+        if (rotationC2B(2, 1) / std::sin(yRot) > 0) {
+            zRot2 = std::acos(-rotationC2B(2, 0) / std::sin(yRot));
+        } else {
+            zRot2 = -std::acos(-rotationC2B(2, 0) / std::sin(yRot));
+        }
+    }
+
+    zRot2 = zRot2 - (M_PI - angleRadian);
+
+    // 회전 매트릭스 분해 끝
+
+    double cosTheta = std::cos(yRot);
+    double sinTheta = std::sin(yRot);
+    double cosPsi = std::cos(zRot);
+    double sinPsi = std::sin(zRot);
+    double cosPhi = std::cos(zRot2);
+    double sinPhi = std::sin(zRot2);
+
+    rotationC2B(0, 0) = cosPsi * cosTheta * cosPhi - sinPsi * sinPhi;
+    rotationC2B(0, 1) = -cosPsi * cosTheta * sinPhi - sinPsi * cosPhi;
+    rotationC2B(0, 2) = cosPsi * sinTheta;
+    rotationC2B(1, 0) = sinPsi * cosTheta * cosPhi + cosPsi * sinPhi;
+    rotationC2B(1, 1) = -sinPsi * cosTheta * sinPhi + cosPsi * cosPhi;
+    rotationC2B(1, 2) = sinPsi * sinTheta;
+    rotationC2B(2, 0) = -sinTheta * cosPhi;
+    rotationC2B(2, 1) = sinTheta * sinPhi;
+    rotationC2B(2, 2) = cosTheta;
+
+    // 회전 매트릭스 재조립 끝
+
+    cv::Matx31d rotatedVector2 = rotationC2B * cv::Matx31d(0.0, 0.0, -300.0); // 10/05 200 -> 300으로 변경
+    cv::Point3d finalPosition2(rotatedVector2(0, 0) , rotatedVector2(1, 0) , rotatedVector2(2, 0) );
+
+    cv::Matx44d T_cent2(
+      static_cast<double>(rotationC2B(0, 0)), static_cast<double>(rotationC2B(0, 1)), static_cast<double>(rotationC2B(0, 2)), finalPosition2.x + targetPosition.x,
+      static_cast<double>(rotationC2B(1, 0)), static_cast<double>(rotationC2B(1, 1)), static_cast<double>(rotationC2B(1, 2)), finalPosition2.y + targetPosition.y,
+      static_cast<double>(rotationC2B(2, 0)), static_cast<double>(rotationC2B(2, 1)), static_cast<double>(rotationC2B(2, 2)), finalPosition2.z + targetPosition.z,
+      0.0, 0.0, 0.0, 1.0
+    );
+
+    //
+    cv::Matx44d T_end2base2 = T_cent2 * T_end2camera;
+    // cv::Matx44d T_end2base2 = T_leaf * T_end2camera;
+    x2 = T_end2base2(0, 3);
+    y2 = T_end2base2(1, 3);
+    z2 = T_end2base2(2, 3);// + 250;
 
     // end effector의 방향 추출
     cv::Matx33d R_end2base2;
@@ -959,46 +1148,47 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     }
 
     // 초기화
-    double r_rad = 0;
+    double r_rad2 = 0;
     // float p_rad = 180;
-    double yw_rad = 0;  
+    double yw_rad2 = 0;  
 
-    double p_rad = std::acos(R_end2base2(2, 2));
+    double p_rad2 = std::acos(R_end2base2(2, 2));
 
 
-    if (R_end2base2(1, 2) / std::sin(p_rad) > 0) {
-        r_rad = std::acos(R_end2base2(0, 2) / std::sin(p_rad));
+    if (R_end2base2(1, 2) / std::sin(p_rad2) > 0) {
+        r_rad2 = std::acos(R_end2base2(0, 2) / std::sin(p_rad2));
     } else {
-        r_rad = -std::acos(R_end2base2(0, 2) / std::sin(p_rad));
+        r_rad2 = -std::acos(R_end2base2(0, 2) / std::sin(p_rad2));
     }
-    if (R_end2base2(2, 1) / std::sin(p_rad) > 0) {
-        yw_rad = std::acos(-R_end2base2(2, 0) / std::sin(p_rad));
+    if (R_end2base2(2, 1) / std::sin(p_rad2) > 0) {
+        yw_rad2 = std::acos(-R_end2base2(2, 0) / std::sin(p_rad2));
     } else {
-        yw_rad = -std::acos(-R_end2base2(2, 0) / std::sin(p_rad));
+        yw_rad2 = -std::acos(-R_end2base2(2, 0) / std::sin(p_rad2));
     }
 
-    rrr = r_rad * 180.0 / M_PI;
-    ppp = p_rad * 180.0 / M_PI;
-    www = yw_rad * 180.0 / M_PI;
+    r2 = r_rad2 * 180.0 / M_PI;
+    p2 = p_rad2 * 180.0 / M_PI;
+    w2 = yw_rad2 * 180.0 / M_PI;
 
-    calculated_cam_coord[0] = xxx; calculated_cam_coord[1] = yyy; calculated_cam_coord[2] = zzz;
-    calculated_cam_coord[3] = rrr; calculated_cam_coord[4] = ppp; calculated_cam_coord[5] = www;
+    calculated_cam_coord2[0] = x2; calculated_cam_coord2[1] = y2; calculated_cam_coord2[2] = z2;
+    calculated_cam_coord2[3] = r2; calculated_cam_coord2[4] = p2; calculated_cam_coord2[5] = w2;
 
-    std::cout << "task1: x,y,z: " << std::endl
-              << xxx<< ", "<<yyy<< ", "<<zzz << std::endl;
-    std::cout << "task1: r,p,y: " << std::endl
-              << rrr<< ", "<<ppp<< ", "<<www << std::endl;
+    std::cout << "task2: x,y,z: " << std::endl
+              << x2<< ", "<<y2<< ", "<<z2 << std::endl;
+    std::cout << "task2: r,p,y: " << std::endl
+              << r2<< ", "<<p2<< ", "<<w2 << std::endl;
 
-  // 타입 1 end
+    // 타입2 end
 
+    // 타입3
+    float x3, y3, z3, r3, p3, w3;
 
-  // 타입 2
-    float x, y, z, r, p, yw;
-    cv::Matx44d camera2base22;
-    for (int i = 0; i < 4; ++i)
-        for (int j = 0; j < 4; ++j)
-            camera2base22(i, j) = camera2base(i, j);
-
+    cv::Matx44d T_leaf(
+        static_cast<double>(rotationC2B(0, 0)), static_cast<double>(rotationC2B(0, 1)), static_cast<double>(rotationC2B(0, 2)), finalPosition2.x + moved_point.x*1000,
+        static_cast<double>(rotationC2B(1, 0)), static_cast<double>(rotationC2B(1, 1)), static_cast<double>(rotationC2B(1, 2)), finalPosition2.y + moved_point.y*1000,
+        static_cast<double>(rotationC2B(2, 0)), static_cast<double>(rotationC2B(2, 1)), static_cast<double>(rotationC2B(2, 2)), finalPosition2.z + moved_point.z*1000,
+        0.0, 0.0, 0.0, 1.0
+    );
     // cv::Matx44d c2t(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
     //                 0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
     //                 0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.10500000e+00,
@@ -1007,7 +1197,7 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     
     cv::Matx44d c2t(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
                     0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.10500000e+03,
+                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.10500000e+03,            /// 105에서 220으로 변경
                     0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00); 
 
     // Convert cv::Matx44d to Eigen::Matrix4d
@@ -1025,57 +1215,66 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
         for (int j = 0; j < 4; ++j)
             T_end2tool(i, j) = eigenInverse2(i, j);
 
-
     // cv::Matx44d T_end2base = camera2base22* T_end2tool;
-    cv::Matx44d T_end2base = T_leaf * T_end2tool;
+    cv::Matx44d T_end2base3 = T_leaf * T_end2tool;
 
-    x = T_end2base(0, 3);
-    y = T_end2base(1, 3);
-    z = T_end2base(2, 3);
+    // std::cout << "R rotation: " << std::endl
+    //         << T_end2base(0,0)<< ", "<<T_end2base(0,1)<< ", "<< T_end2base(0,2) << std::endl
+    //         << T_end2base(1,0)<< ", "<<T_end2base(1,1)<< ", "<< T_end2base(1,2) << std::endl
+    //         << T_end2base(2,0)<< ", "<<T_end2base(2,1)<< ", "<< T_end2base(2,2) << std::endl;
+
+
+    x3 = T_end2base3(0, 3);
+    y3 = T_end2base3(1, 3);
+    z3 = T_end2base3(2, 3);
 
     // end effector의 방향 추출
-    cv::Matx33d R_end2base;
+    cv::Matx33d R_end2base3;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            R_end2base(i, j) = T_end2base(i, j);
+            R_end2base3(i, j) = T_end2base3(i, j);
         }
     }
     
-    double r_rad2 = 0;
+    double r_rad3 = 0;
     // float p_rad = 180;
-    double yw_rad2 = 0; 
+    double yw_rad3 = 0; 
     
-    double p_rad2 = std::acos(R_end2base(2, 2));
+    double p_rad3 = std::acos(R_end2base3(2, 2));
 
-    if (R_end2base(1, 2) / std::sin(p_rad2) > 0) {
-        r_rad2 = std::acos(R_end2base(0, 2) / std::sin(p_rad2));
+    if (R_end2base3(1, 2) / std::sin(p_rad3) > 0) {
+        r_rad3 = std::acos(R_end2base3(0, 2) / std::sin(p_rad3));
     } else {
-        r_rad2 = -std::acos(R_end2base(0, 2) / std::sin(p_rad2));
+        r_rad3 = -std::acos(R_end2base3(0, 2) / std::sin(p_rad3));
     }
-    if (R_end2base(2, 1) / std::sin(p_rad) > 0) {
-        yw_rad2 = std::acos(-R_end2base(2, 0) / std::sin(p_rad2));
+    if (R_end2base3(2, 1) / std::sin(p_rad3) > 0) {
+        yw_rad3 = std::acos(-R_end2base3(2, 0) / std::sin(p_rad3));
     } else {
-        yw_rad2 = -std::acos(-R_end2base(2, 0) / std::sin(p_rad2));
+        yw_rad3 = -std::acos(-R_end2base3(2, 0) / std::sin(p_rad3));
     }
 
-    r = r_rad2 * 180.0 / M_PI;
-    p = p_rad2 * 180.0 / M_PI;
-    yw = yw_rad2 * 180.0 / M_PI;
+    r3 = r_rad2 * 180.0 / M_PI;
+    p3= p_rad2 * 180.0 / M_PI;
+    w3 = yw_rad2 * 180.0 / M_PI;
 
-    std::cout << "task2: x,y,z: " << std::endl
-            << x<< ", "<<y<< ", "<<z << std::endl;
-    std::cout << "task2: r,p,y: " << std::endl
-            << r<< ", "<<p<< ", "<<yw << std::endl;
+    std::cout << "task3: x,y,z: " << std::endl
+            << x3<< ", "<<y3<< ", "<<z3 << std::endl;
+    std::cout << "task3: r,p,y: " << std::endl
+            << r3<< ", "<<p3<< ", "<<w3 << std::endl;    
 
-    calculated_tool_coord[0] = x; calculated_tool_coord[1] = y; calculated_tool_coord[2] = z;
+
+    ///////// 10.05 추가 내용 /////////////
+    // cv::Point vect = (0,1);
+    
+
+    ////
+    calculated_tool_coord[0] = x3; calculated_tool_coord[1] = y3; calculated_tool_coord[2] = z3;
     // calculated_tool_coord[0] = x * 1000; calculated_tool_coord[1] = y * 1000; calculated_tool_coord[2] = z * 1000;
-    calculated_tool_coord[3] = r; calculated_tool_coord[4] = p; calculated_tool_coord[5] = yw;
-
-  
+    calculated_tool_coord[3] = r3; calculated_tool_coord[4] = p3; calculated_tool_coord[5] = w3;// - deltadegreeFloat;
 
 } 
 
-void plantfarm_ui::abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_depth, pcl::PointCloud<pcl::PointXYZ> cloud1, pcl::PointCloud<pcl::PointXYZ> cloud2)
+void plantfarm_ui::abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_depth, pcl::PointCloud<pcl::PointXYZ> cloud1, pcl::PointCloud<pcl::PointXYZ> cloud2, cv::Point direction)
   {
     // get the current pose and rotm of the robot
     dsr_msgs::GetCurrentPosx get_current_pose_srv;
@@ -1164,8 +1363,7 @@ void plantfarm_ui::abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_d
     // 결과 출력
     // std::cout << "Distance between transformed (0,0,0) and centroid1: " << distance << std::endl;
 
-    compute_normal(cloud_base, camera2endeffector, endeffector2base, centroid_point2,
-              centroid1, camera2base, moved_point);
+    compute_normal(cloud_base, camera2endeffector, endeffector2base, centroid_point2, centroid1, camera2base, moved_point, direction);
     
 
 }
@@ -1388,7 +1586,7 @@ void plantfarm_ui::on_pushButton_process_get_coord_clicked()
     // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
     movel(target,velx,accx,4.5,0,0,0,0,0);
-    wait(4.5);
+    wait(4.9);
 
     cv::Mat showimage_bgr = yolo_image.clone();
     cv::Mat showimage;
@@ -1396,6 +1594,23 @@ void plantfarm_ui::on_pushButton_process_get_coord_clicked()
     cv::resize(showimage, showimage, cv::Size(640, 480));
     ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 
+    for(int i=0; i< calculated_cam_coord2.size(); i++) target_coord[i] = calculated_cam_coord2[i];
+
+    text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
+    ui->textEdit_process_log->append(text_for_append);
+
+    text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
+    ui->textEdit_process_log->append(text_for_append);
+
+    float target2[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
+
+    movel(target2,velx,accx,4.5,0,0,0,0,0);
+    wait(4.7);
+
+    showimage_bgr = yolo_image.clone();
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 }
 
 void plantfarm_ui::on_pushButton_process_move_auto_clicked()
@@ -1432,7 +1647,7 @@ void plantfarm_ui::on_pushButton_process_move_auto_clicked()
     // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
     movel(target,velx,accx,4.5,0,0,0,0,0);
-    wait(4.6);
+    wait(4.8);
 
     cv::Mat showimage_bgr = yolo_image.clone();
     cv::Mat showimage;
@@ -1441,7 +1656,7 @@ void plantfarm_ui::on_pushButton_process_move_auto_clicked()
     ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 
     ////////////////////////////////////////////////////////////////////////////
-    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord[i];
+    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord2[i];
 
     text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
     ui->textEdit_process_log->append(text_for_append);
@@ -1454,14 +1669,14 @@ void plantfarm_ui::on_pushButton_process_move_auto_clicked()
     // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
     movel(target2,velx,accx,4.5,0,0,0,0,0);
-    wait(4.6);
+    wait(4.8);
 
     showimage_bgr = yolo_image.clone();
     cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
     cv::resize(showimage, showimage, cv::Size(640, 480));
     ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
     ////////////////////////////////////////////////////////
-    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord[i];
+    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord2[i];
 
     text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
     ui->textEdit_process_log->append(text_for_append);
@@ -1527,11 +1742,11 @@ void plantfarm_ui::on_pushButton_process_move_robot_clicked()
     ui->textEdit_process_log->append(text_for_append1);
     movel(target_tool,velx,accx,4.5,0,0,0,0,0);
 
-    cv::Mat showimage_bgr = yolo_image.clone();
-    cv::Mat showimage;
-    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
-    cv::resize(showimage, showimage, cv::Size(640, 480));
-    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+    // cv::Mat showimage_bgr = yolo_image.clone();
+    // cv::Mat showimage;
+    // cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    // cv::resize(showimage, showimage, cv::Size(640, 480));
+    // ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 }
 
 void plantfarm_ui::on_pushButton_process_move_gripper_clicked()
@@ -1539,7 +1754,7 @@ void plantfarm_ui::on_pushButton_process_move_gripper_clicked()
     //state 0 -> off, state 1 -> on, else -> stop
 
     move_gripper(0);
-    wait(0.2);
+    wait(1.0);
     move_gripper(1);
 }
 

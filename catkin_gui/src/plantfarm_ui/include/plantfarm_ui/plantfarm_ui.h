@@ -185,10 +185,10 @@ public:
     void image_pipeline(cv::Mat depth_image, std::vector<std::vector<cv::Point>> contours, std::vector<std::vector<cv::Point>> kpt);
     cv::Mat dot_kpt_mask(cv::Mat &depth_image, std::vector<std::vector<cv::Point>> contour, std::vector<std::vector<cv::Point>> kpt, int idx);
     void publish_pointcloud(pcl::PointCloud<pcl::PointXYZ> cloud);
-    void abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_depth, pcl::PointCloud<pcl::PointXYZ> cloud1, pcl::PointCloud<pcl::PointXYZ> cloud2);
+    void abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_depth, pcl::PointCloud<pcl::PointXYZ> cloud1, pcl::PointCloud<pcl::PointXYZ> cloud2 , cv::Point direction);
     pcl::PointXYZ move_point_towards(const pcl::PointCloud<pcl::PointXYZ>& cloud1, const pcl::PointCloud<pcl::PointXYZ>& cloud2, double distance);
     void compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base, Eigen::Matrix4d camera2endeffector, Eigen::Matrix4d endeffector2base, Eigen::Matrix<float, 4, 1> centroid_point2,
-                        Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point);
+                        Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point, cv::Point direction);
     cv::Mat make_contour_mask(cv::Mat &depth_image, std::vector<std::vector<cv::Point>> contour, std::vector<std::vector<cv::Point>> kpt, int idx);
 
     // etc functions
@@ -199,6 +199,8 @@ public:
 
     float robot_current_pose[6];
     float robot_current_posx[6];
+
+    // double deltadegree;
 
     cv::Mat color_image;
     cv::Mat color_image_raw;
@@ -225,6 +227,7 @@ public:
     std::vector<cv::Mat> t2c_t;
 
     std::array<float, 6> calculated_cam_coord;     
+    std::array<float, 6> calculated_cam_coord2;   
     std::array<float, 6> calculated_tool_coord; 
     std::array<float, 6> target_coord; 
     /*void FIX_26082015_getBoardObjectAndImagePoints(const cv::Ptr<cv::aruco::Board> board,

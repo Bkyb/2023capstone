@@ -114,6 +114,7 @@ int main(int argc, char** argv) {
     
   while(ros::ok()){
     ros::spinOnce();
+    // ROS_INFO("I'm alive");
   }
 
   return 0;
