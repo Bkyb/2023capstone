@@ -700,9 +700,9 @@ parameter</string>
     <widget class="QPushButton" name="pushButton_process_get_image">
      <property name="geometry">
       <rect>
-       <x>160</x>
-       <y>520</y>
-       <width>91</width>
+       <x>140</x>
+       <y>580</y>
+       <width>81</width>
        <height>31</height>
       </rect>
      </property>
@@ -713,7 +713,7 @@ parameter</string>
     <widget class="QPushButton" name="pushButton_process_get_coord">
      <property name="geometry">
       <rect>
-       <x>300</x>
+       <x>160</x>
        <y>520</y>
        <width>121</width>
        <height>31</height>
@@ -797,7 +797,7 @@ parameter</string>
     <widget class="QPushButton" name="pushButton_process_move_robot">
      <property name="geometry">
       <rect>
-       <x>470</x>
+       <x>330</x>
        <y>520</y>
        <width>101</width>
        <height>31</height>
@@ -810,14 +810,66 @@ parameter</string>
     <widget class="QPushButton" name="pushButton_process_move_gripper">
      <property name="geometry">
       <rect>
-       <x>160</x>
-       <y>580</y>
+       <x>480</x>
+       <y>520</y>
        <width>91</width>
        <height>31</height>
       </rect>
      </property>
      <property name="text">
-      <string>gripper</string>
+      <string>cutting</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_check">
+     <property name="geometry">
+      <rect>
+       <x>360</x>
+       <y>580</y>
+       <width>51</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>0</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_check_2">
+     <property name="geometry">
+      <rect>
+       <x>420</x>
+       <y>580</y>
+       <width>51</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>1</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_check_3">
+     <property name="geometry">
+      <rect>
+       <x>480</x>
+       <y>580</y>
+       <width>51</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>2</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_process_escape">
+     <property name="geometry">
+      <rect>
+       <x>260</x>
+       <y>580</y>
+       <width>51</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>e</string>
      </property>
     </widget>
    </widget>

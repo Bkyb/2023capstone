@@ -1,4 +1,4 @@
-#include "plantfarm_ui.h"
+ #include "plantfarm_ui.h"
 #include "ui_plantfarm_ui.h"
 
 
@@ -68,6 +68,7 @@ plantfarm_ui::plantfarm_ui(QWidget *parent) :
 
 std::mutex mtx;
 bool moveOnce = false;
+bool kptStop = false;
 int color_info_count = 0;
 double intrinsic_parameter[9];
 double discoeffs[5];
@@ -424,6 +425,7 @@ void plantfarm_ui::yolo_cb(const plantfarm_msg::YoloResultListPtr &yolo)
 
 void plantfarm_ui::yolo_kpt_cb(const plantfarm_msg::YoloKPTPtr &yolo_kpt)
 {
+    // if(kptStop) return;
     auto& yolo_kpt_returns = yolo_kpt->data;
     kpt.clear();
     kpt2.clear();
@@ -693,7 +695,7 @@ cv::Mat plantfarm_ui::dot_kpt_mask(cv::Mat &depth_image, std::vector<std::vector
     // cv::imshow("New_mask", newMask);
     cv::waitKey(1);
 
-    return abnormal_depth_kpt2;
+    return abnormal_depth_kpt2;  // 여기 2로 바꾸기
 }
 
 void plantfarm_ui::publish_pointcloud(pcl::PointCloud<pcl::PointXYZ> cloud)
@@ -756,7 +758,7 @@ void plantfarm_ui::image_pipeline(cv::Mat depth_image, std::vector<std::vector<c
     if(kpt.empty()) return;
     // if(kpt2.empty()) return;
     if(detect_leaves_num != 1) return;
-    ROS_INFO("%d",detect_leaves_num);
+    // ROS_INFO("%d",detect_leaves_num);
     // if(isYoloDied) return;
     for(int i=0; i<contours.size(); i++)
     {
@@ -808,7 +810,7 @@ pcl::PointXYZ plantfarm_ui::move_point_towards(const pcl::PointCloud<pcl::PointX
 }
 
 void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base, Eigen::Matrix4d camera2endeffector, Eigen::Matrix4d endeffector2base, Eigen::Matrix<float, 4, 1> centroid_point2,
-                  Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point, cv::Point direction) {
+                  Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point, pcl::PointXYZ origin_point, cv::Point direction) {
     
 
 
@@ -883,7 +885,7 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     marker.scale.z = 0.05;  // Head length
 
     // Set the color
-    marker.color.r = 1.0;
+    marker.color.r = 1.0; 
     marker.color.g = 0.0;
     marker.color.b = 0.0;
     marker.color.a = 1.0;
@@ -894,7 +896,7 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
 
 
 
-    // 타입 1 start
+    // step 1 start
 
     // Convert Eigen Vector to OpenCV Vec
     cv::Vec3d normal_cv(normal[0], normal[1], normal[2]);
@@ -945,7 +947,7 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
         normalizedDirection[1] = direction.y;
     }
 
-    // std::cout << "normalizedDirection: x = " << normalizedDirection[0] << "y =" << normalizedDirection[1] << std::endl;
+    std::cout << "normalizedDirection: x = " << normalizedDirection[0] << "y =" << normalizedDirection[1] << std::endl;
     // cv::Point vect{0,1};
     double vect[2] = {0,1};
     // cv::Point direction{2,3};
@@ -969,9 +971,9 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     // std::cout << "Angle in radians: " << thetaRadian << std::endl;
     // std::cout << "Angle in degrees: " << thetaDegree << std::endl;
 
-    double deltadegree = 180.0 - angleDegree;
+    // double deltadegree = 180.0 - angleDegree;
 
-    float deltadegreeFloat = static_cast<float>(deltadegree);
+    // float deltadegreeFloat = static_cast<float>(deltadegree);
 
 
     cv::Point3d targetPosition(centroid_point2[0] * 1000.0, centroid_point2[1] *1000.0, centroid_point2[2]*1000.0); 
@@ -1053,10 +1055,10 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     std::cout << "task1: r,p,y: " << std::endl
               << r1<< ", "<<p1<< ", "<<w1 << std::endl;
 
-    // 타입 1 end
+    // step 1 end
 
 
-    // 타입 2 
+    // step 2 
     // 1st calculate z - y - z' rotation form rotation matrix 
     // 2nd add delta theta and make rotation matrix again
 
@@ -1098,8 +1100,8 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
             zRot2 = -std::acos(-rotationC2B(2, 0) / std::sin(yRot));
         }
     }
-
-    zRot2 = zRot2 - (M_PI - angleRadian);
+    if (normalizedDirection[0] < 0) zRot2 = zRot2 - (M_PI - angleRadian);
+    else zRot2 = zRot2 + (M_PI - angleRadian);
 
     // 회전 매트릭스 분해 끝
 
@@ -1178,9 +1180,15 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     std::cout << "task2: r,p,y: " << std::endl
               << r2<< ", "<<p2<< ", "<<w2 << std::endl;
 
-    // 타입2 end
+    // step2 end
 
-    // 타입3
+    calculated_origin_coord2[0] = origin_point.x*1000; calculated_origin_coord2[1] = origin_point.y*1000; calculated_origin_coord2[2] = origin_point.z*1000; 
+
+    calculated_origin_coord[0] = centroid1(0)*1000; calculated_origin_coord[1] = centroid1(1)*1000; calculated_origin_coord[2] = centroid1(2)*1000;
+
+
+
+    // step3
     float x3, y3, z3, r3, p3, w3;
 
     cv::Matx44d T_leaf(
@@ -1197,7 +1205,7 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     
     cv::Matx44d c2t(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
                     0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.10500000e+03,            /// 105에서 220으로 변경
+                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.0000000e+03,            /// 105에서 220으로 변경 // 300 - n = 180
                     0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00); 
 
     // Convert cv::Matx44d to Eigen::Matrix4d
@@ -1218,10 +1226,10 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     // cv::Matx44d T_end2base = camera2base22* T_end2tool;
     cv::Matx44d T_end2base3 = T_leaf * T_end2tool;
 
-    // std::cout << "R rotation: " << std::endl
-    //         << T_end2base(0,0)<< ", "<<T_end2base(0,1)<< ", "<< T_end2base(0,2) << std::endl
-    //         << T_end2base(1,0)<< ", "<<T_end2base(1,1)<< ", "<< T_end2base(1,2) << std::endl
-    //         << T_end2base(2,0)<< ", "<<T_end2base(2,1)<< ", "<< T_end2base(2,2) << std::endl;
+    std::cout << "R rotation: " << std::endl
+            << camera2base(0,0)<< ", "<<camera2base(0,1)<< ", "<< camera2base(0,2) << std::endl
+            << camera2base(1,0)<< ", "<<camera2base(1,1)<< ", "<< camera2base(1,2) << std::endl
+            << camera2base(2,0)<< ", "<<camera2base(2,1)<< ", "<< camera2base(2,2) << std::endl;
 
 
     x3 = T_end2base3(0, 3);
@@ -1253,16 +1261,72 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
         yw_rad3 = -std::acos(-R_end2base3(2, 0) / std::sin(p_rad3));
     }
 
-    r3 = r_rad2 * 180.0 / M_PI;
-    p3= p_rad2 * 180.0 / M_PI;
-    w3 = yw_rad2 * 180.0 / M_PI;
+    r3 = r_rad3 * 180.0 / M_PI;
+    p3= p_rad3 * 180.0 / M_PI;
+    w3 = yw_rad3 * 180.0 / M_PI;
 
     std::cout << "task3: x,y,z: " << std::endl
             << x3<< ", "<<y3<< ", "<<z3 << std::endl;
     std::cout << "task3: r,p,y: " << std::endl
             << r3<< ", "<<p3<< ", "<<w3 << std::endl;    
 
+    //////////////////////////////////////////////////
+    float x4, y4, z4, r4, p4, w4;
 
+     cv::Matx44d c2t2(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+                    0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -0.13000000e+03,            /// 105에서 220으로 변경 // 300 - n = 180
+                    0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00); 
+
+    // Convert cv::Matx44d to Eigen::Matrix4d
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            eigenMatrix(i,j) = c2t2(i,j);
+        }
+    }
+
+    eigenInverse2 = eigenMatrix.inverse();
+
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            T_end2tool(i, j) = eigenInverse2(i, j);
+
+    // cv::Matx44d T_end2base = camera2base22* T_end2tool;
+    cv::Matx44d T_end2base4 = T_leaf * T_end2tool;
+
+
+    x4 = T_end2base4(0, 3);
+    y4 = T_end2base4(1, 3);
+    z4 = T_end2base4(2, 3);
+
+    // end effector의 방향 추출
+    cv::Matx33d R_end2base4;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            R_end2base4(i, j) = T_end2base4(i, j);
+        }
+    }
+    
+    double r_rad4 = 0;
+    // float p_rad = 180;
+    double yw_rad4 = 0; 
+    
+    double p_rad4 = std::acos(R_end2base4(2, 2));
+
+    if (R_end2base4(1, 2) / std::sin(p_rad4) > 0) {
+        r_rad4 = std::acos(R_end2base4(0, 2) / std::sin(p_rad4));
+    } else {
+        r_rad4 = -std::acos(R_end2base4(0, 2) / std::sin(p_rad4));
+    }
+    if (R_end2base4(2, 1) / std::sin(p_rad4) > 0) {
+        yw_rad4 = std::acos(-R_end2base4(2, 0) / std::sin(p_rad4));
+    } else {
+        yw_rad4 = -std::acos(-R_end2base4(2, 0) / std::sin(p_rad4));
+    }
+
+    r4 = r_rad4 * 180.0 / M_PI;
+    p4= p_rad4 * 180.0 / M_PI;
+    w4 = yw_rad4 * 180.0 / M_PI;
     ///////// 10.05 추가 내용 /////////////
     // cv::Point vect = (0,1);
     
@@ -1271,6 +1335,10 @@ void plantfarm_ui::compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base
     calculated_tool_coord[0] = x3; calculated_tool_coord[1] = y3; calculated_tool_coord[2] = z3;
     // calculated_tool_coord[0] = x * 1000; calculated_tool_coord[1] = y * 1000; calculated_tool_coord[2] = z * 1000;
     calculated_tool_coord[3] = r3; calculated_tool_coord[4] = p3; calculated_tool_coord[5] = w3;// - deltadegreeFloat;
+
+    calculated_tool_coord[6] = x4; calculated_tool_coord[7] = y4; calculated_tool_coord[8] = z4;
+    // calculated_tool_coord[0] = x * 1000; calculated_tool_coord[1] = y * 1000; calculated_tool_coord[2] = z * 1000;
+    calculated_tool_coord[9] = r4; calculated_tool_coord[10] = p4; calculated_tool_coord[11] = w4;// - deltadegreeFloat;
 
 } 
 
@@ -1348,7 +1416,8 @@ void plantfarm_ui::abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_d
 
 
     std::cout << "Origin Point: (" << centroid1[0] << ", " << centroid1[1] << ", " << centroid1[2] << ")" << std::endl;
-    pcl::PointXYZ moved_point = move_point_towards(*cloud_base1, *cloud_base2, 20.0/1000);
+    pcl::PointXYZ moved_point = move_point_towards(*cloud_base1, *cloud_base2, 10.0/1000);
+    pcl::PointXYZ moved_point2 = move_point_towards(*cloud_base1, *cloud_base2, 1.0/1000);
     std::cout << "Moved Point: (" << moved_point.x << ", " << moved_point.y << ", " << moved_point.z << ")" << std::endl;
 
     Eigen::Vector4d origin_point(0.0, 0.0, 0.0, 1.0);  // homogeneous coordinates
@@ -1363,7 +1432,7 @@ void plantfarm_ui::abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_d
     // 결과 출력
     // std::cout << "Distance between transformed (0,0,0) and centroid1: " << distance << std::endl;
 
-    compute_normal(cloud_base, camera2endeffector, endeffector2base, centroid_point2, centroid1, camera2base, moved_point, direction);
+    compute_normal(cloud_base, camera2endeffector, endeffector2base, centroid_point2, centroid1, camera2base, moved_point, moved_point2, direction);
     
 
 }
@@ -1548,11 +1617,20 @@ void plantfarm_ui::on_pushButton_process_move_home_clicked()
     // while(moveOnce) ros::spinOnce();
     movel(pos_home,velx,accx,4.5,0,0,0,0,0);
     wait(4.8);
+    //       text_for_append.sprintf("[INFO] Target position \nX : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord[0], calculated_origin_coord[1], calculated_origin_coord[2]);
+    // ui->textEdit_process_log->append(text_for_append);
     // while(true) {
     //     std::lock_guard<std::mutex> lock(mtx);
     //     if(!moveOnce) break;
     //     spinOnce();
     // }
+    text_for_append.sprintf("[INFO] Get detected image!!!");
+    ui->textEdit_process_log->append(text_for_append);
+    cv::Mat showimage_bgr = yolo_image.clone();
+    cv::Mat showimage;
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 }
 
 
@@ -1583,6 +1661,9 @@ void plantfarm_ui::on_pushButton_process_get_coord_clicked()
     float accx[2] = {0,0};
     float target[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
 
+        text_for_append.sprintf("[INFO] 대시야 Target position \nX : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord2[0], calculated_origin_coord2[1], calculated_origin_coord2[2]);
+    ui->textEdit_process_log->append(text_for_append);
+
     // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
     movel(target,velx,accx,4.5,0,0,0,0,0);
@@ -1599,6 +1680,9 @@ void plantfarm_ui::on_pushButton_process_get_coord_clicked()
     text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
     ui->textEdit_process_log->append(text_for_append);
 
+   text_for_append.sprintf("[INFO] 소시야 Target position \nX : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord2[0], calculated_origin_coord2[1], calculated_origin_coord2[2]);
+    ui->textEdit_process_log->append(text_for_append);
+
     text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
     ui->textEdit_process_log->append(text_for_append);
 
@@ -1607,10 +1691,18 @@ void plantfarm_ui::on_pushButton_process_get_coord_clicked()
     movel(target2,velx,accx,4.5,0,0,0,0,0);
     wait(4.7);
 
+    // text_for_append.sprintf("[INFO]  Target position X : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord[0], calculated_origin_coord[1], calculated_origin_coord[2]);
+    // ui->textEdit_process_log->append(text_for_append);
+
+    text_for_append.sprintf("[INFO]  최종 Target position (offset 1mm) X : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord2[0], calculated_origin_coord2[1], calculated_origin_coord2[2]);
+    ui->textEdit_process_log->append(text_for_append);
+
     showimage_bgr = yolo_image.clone();
     cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
     cv::resize(showimage, showimage, cv::Size(640, 480));
     ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+
+    
 }
 
 void plantfarm_ui::on_pushButton_process_move_auto_clicked()
@@ -1688,6 +1780,9 @@ void plantfarm_ui::on_pushButton_process_move_auto_clicked()
 
     // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
     
+        text_for_append.sprintf("[INFO] Target position \nX : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord[0], calculated_origin_coord[1], calculated_origin_coord[2]);
+    ui->textEdit_process_log->append(text_for_append);
+
     movel(target3,velx,accx,4.5,0,0,0,0,0);
     wait(4.6);
 
@@ -1705,6 +1800,8 @@ void plantfarm_ui::on_pushButton_process_move_auto_clicked()
     text_for_append1.sprintf("[INFO] Move to target position!!!");
     ui->textEdit_process_log->append(text_for_append1);
     
+    text_for_append.sprintf("[INFO] Target position \nX : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord[0], calculated_origin_coord[1], calculated_origin_coord[2]);
+    ui->textEdit_process_log->append(text_for_append);
 
     showimage_bgr = yolo_image.clone();
     cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
@@ -1734,13 +1831,17 @@ void plantfarm_ui::on_pushButton_process_move_robot_clicked()
     // rate.sleep();
 
     float target_tool[6] = {calculated_tool_coord[0], calculated_tool_coord[1], calculated_tool_coord[2], calculated_tool_coord[3], calculated_tool_coord[4], calculated_tool_coord[5]};
+    for(int i = 0; i < 6; i++) target_tool_coord[i] = target_tool[i];    
+    float target_tool2[6] = {calculated_tool_coord[6], calculated_tool_coord[7], calculated_tool_coord[8], calculated_tool_coord[9], calculated_tool_coord[10], calculated_tool_coord[11]};
     QString text_for_append0;
-    text_for_append0.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_tool[0], target_tool[1], target_tool[2], target_tool[3], target_tool[4], target_tool[5]);
+    text_for_append0.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_tool2[0], target_tool2[1], target_tool2[2], target_tool2[3], target_tool2[4], target_tool2[5]);
     ui->textEdit_process_log->append(text_for_append0);
     QString text_for_append1;
     text_for_append1.sprintf("[INFO] Move to target position!!!");
     ui->textEdit_process_log->append(text_for_append1);
     movel(target_tool,velx,accx,4.5,0,0,0,0,0);
+    wait(4.7);
+    movel(target_tool2,velx,accx,4.5,0,0,0,0,0);
 
     // cv::Mat showimage_bgr = yolo_image.clone();
     // cv::Mat showimage;
@@ -1749,6 +1850,146 @@ void plantfarm_ui::on_pushButton_process_move_robot_clicked()
     // ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
 }
 
+void plantfarm_ui::on_pushButton_process_escape_clicked()
+{
+    float velx[2] = {0,0};
+    float accx[2] = {0,0};
+
+    float target_[6] = {target_tool_coord[0], target_tool_coord[1], target_tool_coord[2], target_tool_coord[3], target_tool_coord[4], target_tool_coord[5]};
+    movel(target_,velx,accx,4.5,0,0,0,0,0);
+}
+
+void plantfarm_ui::on_pushButton_process_check_clicked()
+{
+    kptStop = true;
+
+    for(int i = 0; i< 20; i++)
+    {
+        QString text_for_append;
+        text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord2[0], calculated_origin_coord2[1], calculated_origin_coord2[2]);
+        ui->textEdit_process_log->append(text_for_append);
+        wait(0.5);
+    }
+
+    kptStop = false;
+}
+
+void plantfarm_ui::on_pushButton_process_check_2_clicked()
+{
+    kptStop = true;
+    float distance; 
+    float op_point[3];
+    float pixel[2];
+    pixel[0] = kpt[0][0].x - 1.0;
+    pixel[1] = kpt[0][0].y - 5.0;
+
+
+            QString text_for_append3;
+        text_for_append3.sprintf("[INFO] X : %.5f, Y : %.5f ", pixel[0], pixel[1]);
+        ui->textEdit_process_log->append(text_for_append3);
+
+    dsr_msgs::GetCurrentPosx get_current_pose_srv;
+    dsr_msgs::GetCurrentRotm get_current_rotm_srv;
+    get_current_pose_srv.request.ref = 0;
+    get_current_rotm_srv.request.ref = 0;
+    get_current_pose_client.call(get_current_pose_srv);
+    get_current_rotm_client.call(get_current_rotm_srv);
+    if (get_current_pose_srv.response.success == false)
+    {
+      return;
+    }
+    if (get_current_rotm_srv.response.success == false)
+    {
+      return;
+    }
+    // homogeneous transformation matrix from camera to endeffector
+    cv::Matx44d camera2endeffector = {
+                                    0.9995884550916401, -0.0286509350929972, -0.001429813206316577, -31.81668840797239,
+                                    0.02858327133778271, 0.9989768060104955, -0.03504764831909967,  -99.62247870764079,
+                                    0.002432498127190477, 0.03499235589904547, 0.9993846196442566, -2.546049086854508,
+                                    0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00
+                                    };
+    cv::Matx44d endeffector2base = {
+                        get_current_rotm_srv.response.rot_matrix[0].data[0], get_current_rotm_srv.response.rot_matrix[0].data[1], get_current_rotm_srv.response.rot_matrix[0].data[2], get_current_pose_srv.response.task_pos_info[0].data[0],
+                        get_current_rotm_srv.response.rot_matrix[1].data[0], get_current_rotm_srv.response.rot_matrix[1].data[1], get_current_rotm_srv.response.rot_matrix[1].data[2], get_current_pose_srv.response.task_pos_info[0].data[1],
+                        get_current_rotm_srv.response.rot_matrix[2].data[0], get_current_rotm_srv.response.rot_matrix[2].data[1], get_current_rotm_srv.response.rot_matrix[2].data[2], get_current_pose_srv.response.task_pos_info[0].data[2],
+                        0.0, 0.0, 0.0, 1.0
+    };
+    // camera2endeffector << 9.99033876e-01, -4.03820491e-02, -1.73379364e-02, -31.1268,
+    //     3.98650088e-02, 9.98778398e-01, -2.91974786e-02, -99.9189,
+    //     1.84958104e-02, 2.84780933e-02, 9.99423285e-01, -4.4774,
+    //     0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00;
+    // camera2endeffector << 0.9995884550916401, -0.0286509350929972, -0.001429813206316577, -31.81668840797239,
+    //                     0.02858327133778271, 0.9989768060104955, -0.03504764831909967,  -99.62247870764079,
+    //                     0.002432498127190477, 0.03499235589904547, 0.9993846196442566, -2.546049086854508,
+    //                     0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00;
+    // endeffector2base << get_current_rotm_srv.response.rot_matrix[0].data[0], get_current_rotm_srv.response.rot_matrix[0].data[1], get_current_rotm_srv.response.rot_matrix[0].data[2], get_current_pose_srv.response.task_pos_info[0].data[0],
+    //                     get_current_rotm_srv.response.rot_matrix[1].data[0], get_current_rotm_srv.response.rot_matrix[1].data[1], get_current_rotm_srv.response.rot_matrix[1].data[2], get_current_pose_srv.response.task_pos_info[0].data[1],
+    //                     get_current_rotm_srv.response.rot_matrix[2].data[0], get_current_rotm_srv.response.rot_matrix[2].data[1], get_current_rotm_srv.response.rot_matrix[2].data[2], get_current_pose_srv.response.task_pos_info[0].data[2],
+    //                     0, 0, 0, 1;
+
+ cv::Matx41d leaf_cal_in;
+ cv::Matx41d leaf_cal_out;
+
+    for(int i = 0; i< 20; i++)
+    {
+        distance = depth_image.at<float>(pixel[1], pixel[0])*1000;
+        rs2_deproject_pixel_to_point(op_point, &RS_camera_info_, pixel, distance);
+
+        leaf_cal_in.val[0] = op_point[0];
+        leaf_cal_in.val[1] = op_point[1];
+        leaf_cal_in.val[2] = op_point[2];
+        leaf_cal_in.val[3] = 1;
+        // EigenOp << op_point[0], op_point[1], op_point[2], 1.0;
+
+        leaf_cal_out = endeffector2base * camera2endeffector * leaf_cal_in;
+
+        QString text_for_append;
+        text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f ", leaf_cal_out.val[0], leaf_cal_out.val[1], leaf_cal_out.val[2]);
+        ui->textEdit_process_log->append(text_for_append);
+        wait(0.5);
+    }
+
+    kptStop = false;
+}
+
+void plantfarm_ui::on_pushButton_process_check_3_clicked()
+{
+    for(int i=0; i< calculated_cam_coord.size(); i++) target_coord[i] = calculated_cam_coord[i];
+    
+    QString text_for_append;
+    text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
+    ui->textEdit_process_log->append(text_for_append);
+
+    text_for_append.sprintf("[INFO] 소시야로 이동합니다!!!");
+    ui->textEdit_process_log->append(text_for_append);
+
+    float velx[2] = {0,0};
+    float accx[2] = {0,0};
+    float target[6] = {target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]}; 
+
+        text_for_append.sprintf("[INFO] 대시야 Target position \nX : %.5f, Y : %.5f, Z : %.5f ", calculated_origin_coord2[0], calculated_origin_coord2[1], calculated_origin_coord2[2]);
+    ui->textEdit_process_log->append(text_for_append);
+
+    // for(int i=0; i< target_coord.size(); i++) target_coord[i] = target[i];
+    
+    movel(target,velx,accx,4.5,0,0,0,0,0);
+    wait(4.9);
+
+    cv::Mat showimage_bgr = yolo_image.clone();
+    cv::Mat showimage;
+    cv::cvtColor(showimage_bgr,showimage, cv::COLOR_BGR2RGB);
+    cv::resize(showimage, showimage, cv::Size(640, 480));
+    ui->label_process_image_raw->setPixmap(QPixmap::fromImage(QImage(showimage.data, showimage.cols, showimage.rows, showimage.step, QImage::Format_RGB888)));
+
+    for(int i=0; i< calculated_cam_coord2.size(); i++) target_coord[i] = calculated_cam_coord2[i];
+
+    text_for_append.sprintf("[INFO] X : %.5f, Y : %.5f, Z : %.5f \n      Z' : %.5f, Y' : %.5f, Z'' : %.5f", target_coord[0], target_coord[1], target_coord[2], target_coord[3], target_coord[4], target_coord[5]);
+    ui->textEdit_process_log->append(text_for_append);
+
+}
+
+
 void plantfarm_ui::on_pushButton_process_move_gripper_clicked()
 {
     //state 0 -> off, state 1 -> on, else -> stop
@@ -1756,6 +1997,14 @@ void plantfarm_ui::on_pushButton_process_move_gripper_clicked()
     move_gripper(0);
     wait(1.0);
     move_gripper(1);
+    wait(1.0);
+
+    float velx[2] = {0,0};
+    float accx[2] = {0,0};
+
+    float target_[6] = {target_tool_coord[0], target_tool_coord[1], target_tool_coord[2], target_tool_coord[3], target_tool_coord[4], target_tool_coord[5]};
+    movel(target_,velx,accx,4.5,0,0,0,0,0);
+    wait(4.5);
 }
 
 // void plantfarm_ui::on_pushButton_haneye_calibration_home_clicked()
@@ -2191,109 +2440,110 @@ void plantfarm_ui::on_pushButton_process_move_gripper_clicked()
 
 // }
 
-// void plantfarm_ui::on_pushButton_currentPosx_clicked()
-// {
-//     ui->stackedWidget->setCurrentIndex(2);
-// }
+void plantfarm_ui::on_pushButton_currentPosx_clicked()
+{
+    ui->stackedWidget->setCurrentIndex(3);
+}
 
-// void plantfarm_ui::on_pushButton_currentPosx_get_clicked()
-// {
-//   ros::NodeHandlePtr node = boost::make_shared<ros::NodeHandle>();
-//   ros::ServiceClient srvGetposx = node->serviceClient<dsr_msgs::GetCurrentPosx>("/dsr01m1013/aux_control/get_current_posx");
-//   dsr_msgs::GetCurrentPosx srv;
-//   srv.request.ref = 0;
+void plantfarm_ui::on_pushButton_currentPosx_get_clicked()
+{
+  ros::NodeHandlePtr node = boost::make_shared<ros::NodeHandle>();
+  ros::ServiceClient srvGetposx = node->serviceClient<dsr_msgs::GetCurrentPosx>("/dsr01m1013/aux_control/get_current_posx");
+  dsr_msgs::GetCurrentPosx srv;
+  srv.request.ref = 0;
 
-//   cv::Matx44d c2t(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-//                     0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-//                     0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -1.00000000e+02,
-//                     0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00);
-//   QString text_for_append;
+  cv::Matx44d c2t(1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+                    0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
+                    0.00000000e+00, 0.00000000e+00, 1.00000000e+00, -1.05000000e+02,
+                    0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00);
+  QString text_for_append;
 
-//   if(srvGetposx.call(srv))
-//   {
-//       for(int i=0; i<6; i++)
-//       {
-//         plantfarm_ui::robot_current_posx[i] = srv.response.task_pos_info[0].data[i];
-//       }
-//       float r_rad = robot_current_posx[3] * M_PI / 180.0;
-//       float p_rad = robot_current_posx[4] * M_PI / 180.0;
-//       float yw_rad =robot_current_posx[5] * M_PI / 180.0;   
+  if(srvGetposx.call(srv))
+  {
+      for(int i=0; i<6; i++)
+      {
+        plantfarm_ui::robot_current_posx[i] = srv.response.task_pos_info[0].data[i];
+      }
+      float r_rad = robot_current_posx[3] * M_PI / 180.0;
+      float p_rad = robot_current_posx[4] * M_PI / 180.0;
+      float yw_rad =robot_current_posx[5] * M_PI / 180.0;   
 
 
-//       // base to camera의 변환 행렬 계산
-//       cv::Vec3d translation(robot_current_posx[0], robot_current_posx[1], robot_current_posx[2]);
+      // base to camera의 변환 행렬 계산
+      cv::Vec3d translation(robot_current_posx[0], robot_current_posx[1], robot_current_posx[2]);
 
-//       cv::Matx33d Rz1(
-//           std::cos(r_rad), -std::sin(r_rad), 0,
-//           std::sin(r_rad), std::cos(r_rad), 0,
-//           0, 0, 1
-//       );
-//       cv::Matx33d Ry(
-//           std::cos(p_rad), 0, std::sin(p_rad),
-//           0, 1, 0,
-//           -std::sin(p_rad), 0, std::cos(p_rad)
-//       );
-//       cv::Matx33d Rz2(
-//           std::cos(yw_rad), -std::sin(yw_rad), 0,
-//           std::sin(yw_rad), std::cos(yw_rad), 0,
-//           0, 0, 1
-//       );
+      cv::Matx33d Rz1(
+          std::cos(r_rad), -std::sin(r_rad), 0,
+          std::sin(r_rad), std::cos(r_rad), 0,
+          0, 0, 1
+      );
+      cv::Matx33d Ry(
+          std::cos(p_rad), 0, std::sin(p_rad),
+          0, 1, 0,
+          -std::sin(p_rad), 0, std::cos(p_rad)
+      );
+      cv::Matx33d Rz2(
+          std::cos(yw_rad), -std::sin(yw_rad), 0,
+          std::sin(yw_rad), std::cos(yw_rad), 0,
+          0, 0, 1
+      );
 
-//       cv::Matx33d R_t2b = Rz1 * Ry * Rz2;
-//       cv::Matx44d T_t2b = cv::Matx44d::eye();
-//       for (int i = 0; i < 3; i++) {
-//           for (int j = 0; j < 3; j++) {
-//               T_t2b(i, j) = R_t2b(i, j);
-//           }
-//           T_t2b(i, 3) = translation(i);
-//       }
+      cv::Matx33d R_t2b = Rz1 * Ry * Rz2;
+      cv::Matx44d T_t2b = cv::Matx44d::eye();
+      for (int i = 0; i < 3; i++) {
+          for (int j = 0; j < 3; j++) {
+              T_t2b(i, j) = R_t2b(i, j);
+          }
+          T_t2b(i, 3) = translation(i);
+      }
 
-//       // end effector to camera의 역변환 행렬
-//       cv::Matx44d T_end2tool = c2t.inv();
+      // end effector to camera의 역변환 행렬
+      cv::Matx44d T_end2tool = c2t.inv();
 
-//       // end effector의 위치 추출
-//       cv::Matx44d T_end2base = T_t2b * T_end2tool;
-//       float xt = T_end2base(0, 3);
-//       float yt = T_end2base(1, 3);
-//       float zt = T_end2base(2, 3);
+      // end effector의 위치 추출
+      cv::Matx44d T_end2base = T_t2b * T_end2tool;
+      float xt = T_end2base(0, 3);
+      float yt = T_end2base(1, 3);
+      float zt = T_end2base(2, 3);
 
-//       ui->textEdit_currentPosx_log->append(text_for_append.sprintf(
-//       " <pos> %7.5f %7.5f %7.5f ",xt,yt,zt));
+      ui->textEdit_currentPosx_log->append(text_for_append.sprintf(
+      " <pos> %7.5f %7.5f %7.5f ",xt,yt,zt));
 
-//       //return (srv.response.success);
-//   }
-//   else
-//   {
-//       ui->textEdit_currentPosx_log->append("fail!");
-//       ros::shutdown();
-//      // return -1;
-//   }
+      //return (srv.response.success);
+  }
+  else
+  {
+      ui->textEdit_currentPosx_log->append("fail!");
+      ros::shutdown();
+     // return -1;
+  }
 
-// }
+}
 
-// void plantfarm_ui::on_pushButton_currentPosx_home_clicked()
-// {
-//   QMessageBox mb;
+void plantfarm_ui::on_pushButton_currentPosx_home_clicked()
+{
+  QMessageBox mb;
 
-//   mb.setText("Are you sure you want to return to home?");
-//   mb.setStandardButtons(QMessageBox::Cancel | QMessageBox::Ok);
-//   mb.setDefaultButton(QMessageBox::Cancel);
-//   mb.setIcon(QMessageBox::Icon::Warning);
+  mb.setText("Are you sure you want to return to home?");
+  mb.setStandardButtons(QMessageBox::Cancel | QMessageBox::Ok);
+  mb.setDefaultButton(QMessageBox::Cancel);
+  mb.setIcon(QMessageBox::Icon::Warning);
 
-//   // mb.move(470, 350);
+  // mb.move(470, 350);
   
-//   int ret = mb.exec();
+  int ret = mb.exec();
 
-//   switch(ret)
-//   {
-//   case QMessageBox::Ok :
-//     ui->stackedWidget->setCurrentIndex(0);
-//     break;
+  switch(ret)
+  {
+  case QMessageBox::Ok :
+    ui->stackedWidget->setCurrentIndex(0);
+    break;
 
-//   case QMessageBox::Cancel:
-//     break;
-//   }
-// }
+  case QMessageBox::Cancel:
+    break;
+  }
+}
 
 
 
+//748.85468, Y : 180.83562, Z : 101.76945 

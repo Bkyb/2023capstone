@@ -188,7 +188,7 @@ public:
     void abnormal_pointcloud(pcl::PointCloud<pcl::PointXYZ> abnormal_depth, pcl::PointCloud<pcl::PointXYZ> cloud1, pcl::PointCloud<pcl::PointXYZ> cloud2 , cv::Point direction);
     pcl::PointXYZ move_point_towards(const pcl::PointCloud<pcl::PointXYZ>& cloud1, const pcl::PointCloud<pcl::PointXYZ>& cloud2, double distance);
     void compute_normal(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_base, Eigen::Matrix4d camera2endeffector, Eigen::Matrix4d endeffector2base, Eigen::Matrix<float, 4, 1> centroid_point2,
-                        Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point, cv::Point direction);
+                        Eigen::Vector4f centroid1, Eigen::Matrix4d camera2base, pcl::PointXYZ moved_point, pcl::PointXYZ origin_point, cv::Point direction);
     cv::Mat make_contour_mask(cv::Mat &depth_image, std::vector<std::vector<cv::Point>> contour, std::vector<std::vector<cv::Point>> kpt, int idx);
 
     // etc functions
@@ -217,6 +217,7 @@ public:
     int image_w, image_h;
     int detect_leaves_num, RobotState;
     bool isYoloDied;
+    // bool kptStop;
 
 
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (pcl::PointCloud<pcl::PointXYZRGB>);
@@ -226,10 +227,13 @@ public:
     std::vector<cv::Mat> t2c_r;
     std::vector<cv::Mat> t2c_t;
 
+    std::array<float, 3> calculated_origin_coord; 
+    std::array<float, 3> calculated_origin_coord2; 
     std::array<float, 6> calculated_cam_coord;     
     std::array<float, 6> calculated_cam_coord2;   
-    std::array<float, 6> calculated_tool_coord; 
+    std::array<float, 12> calculated_tool_coord; 
     std::array<float, 6> target_coord; 
+    std::array<float, 6> target_tool_coord; 
     /*void FIX_26082015_getBoardObjectAndImagePoints(const cv::Ptr<cv::aruco::Board> board,
                                                 std::vector<cv::Point2f> _corners,
                                                 std::vector<int>         _ids,
@@ -279,7 +283,15 @@ private slots:
 
     void on_pushButton_process_move_gripper_clicked();
 
-    // void on_pushButton_currentPosx_clicked();
+    void on_pushButton_process_escape_clicked();
+
+    void on_pushButton_process_check_clicked();
+
+    void on_pushButton_process_check_2_clicked();
+
+    void on_pushButton_process_check_3_clicked();
+
+    void on_pushButton_currentPosx_clicked();
 
     // void on_pushButton_haneye_calibration_home_clicked();
 
@@ -301,9 +313,9 @@ private slots:
 
     // void on_pushButton_process_start_plat_clicked();  
     
-    // void on_pushButton_currentPosx_get_clicked();
+    void on_pushButton_currentPosx_get_clicked();
 
-    // void on_pushButton_currentPosx_home_clicked();
+    void on_pushButton_currentPosx_home_clicked();
 
 private:
 
